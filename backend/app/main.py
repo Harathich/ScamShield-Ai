@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes.analyze import router as analyze_router
 from app.routes.analyze_domain import router as analyze_domain_router
+from app.routes.language import router as language_router
 app = FastAPI(
     title="ScamShield AI Backend",
     version="1.0.0"
@@ -18,6 +19,7 @@ app.add_middleware(
 
 app.include_router(analyze_router)
 app.include_router(analyze_domain_router)
+app.include_router(language_router)
 @app.get("/")
 def root():
     return {
