@@ -31,7 +31,7 @@ Return ONLY valid JSON.
 The JSON schema must exactly match:
 
 {
-  "agent": "Reputation Agent",
+  "agent": "reputation",
   "risk_score": 0,
   "threat_level": "",
   "reputation": "",
@@ -50,10 +50,10 @@ Rules
 
 - Risk score must be between 0 and 100.
 - threat_level must be one of:
-  Low
-  Medium
-  High
-  Critical
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
 - reputation should be:
   Safe
   Suspicious
