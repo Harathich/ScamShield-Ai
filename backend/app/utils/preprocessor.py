@@ -92,7 +92,13 @@ class ContentPreprocessor:
             if exp not in formatted_urls:
                 formatted_urls.insert(0, exp)
 
-        extracted_emails = list(dict.fromkeys(cls.EMAIL_REGEX.findall(raw_text)))
+        formatted_emails = []
+        for email in cls.EMAIL_REGEX.findall(raw_text):
+            # The regex permits dots in domains, so strip sentence punctuation
+            # that immediately follows an otherwise valid email address.
+            email_clean = email.rstrip('.,;!?:')
+            if email_clean not in formatted_emails:
+                formatted_emails.append(email_clean)
         extracted_phones = list(dict.fromkeys(cls.PHONE_REGEX.findall(raw_text)))
 
         # 5. Format Detection
@@ -109,7 +115,7 @@ class ContentPreprocessor:
             clean_text=cleaned if cleaned else raw_text,
             raw_text=raw_text,
             extracted_urls=formatted_urls,
-            extracted_emails=extracted_emails,
+            extracted_emails=formatted_emails,
             extracted_phones=extracted_phones,
             detected_format=detected_format
         )

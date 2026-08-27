@@ -131,6 +131,19 @@ class RiskManager:
                     factor += ", ".join(red_flags[:2]) if red_flags else result.get("reason", "Recruitment anomalies")
                 contributing_factors.append(factor)
 
+        # Never label a message LOW risk if no agent completed. This avoids a
+        # fail-open result when the LLM provider or request configuration fails.
+        if not confidences:
+            return {
+                "overall_risk_score": 0,
+                "overall_threat_level": "UNKNOWN",
+                "contributing_factors": [
+                    "Analysis incomplete: no risk-detection agent completed successfully."
+                ],
+                "agent_scores": agent_scores,
+                "confidence": 0,
+            }
+
         # Calculate overall score
         if total_weight > 0:
             overall_score = round(weighted_sum / total_weight)

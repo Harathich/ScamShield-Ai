@@ -19,6 +19,12 @@ def full_analysis(request: FullAnalysisRequest):
     Cleans noise/obfuscation, extracts URLs/emails/phones, executes all 5 agents,
     evaluates overall risk through Risk Manager, and generates a user-friendly report.
     """
+    if not (request.text or "").strip() and not (request.url or "").strip():
+        raise HTTPException(
+            status_code=422,
+            detail="Provide non-empty text or a URL to analyze.",
+        )
+
     try:
         initial_state = {
             "input_text": request.text or "",
