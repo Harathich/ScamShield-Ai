@@ -1,5 +1,6 @@
 import json
 import re
+from pydantic import ValidationError
 
 from app.services.llm.llm_service import LLMService
 from app.utils.prompt_loader import load_prompt
@@ -30,10 +31,23 @@ class RecruitmentAgent:
         )
 
         try:
-            return self._parse_json(response)
-        except json.JSONDecodeError as e:
-            # Add basic fallback if parsing completely fails but we don't want to crash
-            raise ValueError(f"Recruitment Agent returned invalid JSON: {str(e)}")
+            parsed_data = self._parse_json(response)
+            # Validate against schema to avoid ResponseValidationError later
+            from app.models.recruitment_models import RecruitmentResponse
+            validated_data = RecruitmentResponse(**parsed_data)
+            return validated_data.model_dump()
+        except (json.JSONDecodeError, ValidationError) as e:
+            # Fallback for parsing or validation error to prevent 500
+            return {
+                "risk_score": 50,
+                "risk_level": "MEDIUM",
+                "confidence": 0.0,
+                "job_information": {},
+                "consistency_findings": [],
+                "recruitment_red_flags": [],
+                "reason": "Analysis failed due to malformed response.",
+                "recommendations": []
+            }
 
     def _parse_json(self, response: str) -> dict:
         """Robustly parse JSON, handling common LLM formatting issues."""
