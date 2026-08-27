@@ -15,7 +15,7 @@ def full_analysis(request: FullAnalysisRequest):
     """
     Run the full ScamShield multi-agent analysis pipeline.
 
-    Executes all agents (Threat, Language, Identity, Domain, Recruiter),
+    Executes all agents (Threat, Language, Identity, Domain, Recruitment),
     aggregates results through the Risk Manager, and generates a
     user-friendly report via the Report Generator.
 
@@ -31,7 +31,7 @@ def full_analysis(request: FullAnalysisRequest):
             "language_result": None,
             "identity_result": None,
             "domain_result": None,
-            "recruiter_result": None,
+            "recruitment_result": None,
             "risk_manager_result": None,
             "report": None,
             "overall_risk_score": None,
@@ -54,7 +54,7 @@ def full_analysis(request: FullAnalysisRequest):
             language_result=result.get("language_result"),
             identity_result=result.get("identity_result"),
             domain_result=result.get("domain_result"),
-            recruiter_result=result.get("recruiter_result"),
+            recruitment_result=result.get("recruitment_result"),
         )
 
     except Exception as e:

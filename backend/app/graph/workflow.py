@@ -2,7 +2,7 @@
 LangGraph workflow definition for the ScamShield multi-agent pipeline.
 
 Graph structure:
-    START → threat → language → identity → domain → recruiter
+    START → threat → language → identity → domain → recruitment
          → risk_manager → report → END
 
 Each agent runs sequentially. The domain node auto-skips if no URL
@@ -18,7 +18,7 @@ from app.graph.nodes import (
     language_node,
     identity_node,
     domain_node,
-    recruiter_node,
+    recruitment_node,
     risk_manager_node,
     report_node,
 )
@@ -34,7 +34,7 @@ def build_workflow():
     graph.add_node("language", language_node)
     graph.add_node("identity", identity_node)
     graph.add_node("domain", domain_node)
-    graph.add_node("recruiter", recruiter_node)
+    graph.add_node("recruitment", recruitment_node)
     graph.add_node("risk_manager", risk_manager_node)
     graph.add_node("report", report_node)
 
@@ -44,10 +44,10 @@ def build_workflow():
     graph.add_edge("threat", "language")
     graph.add_edge("language", "identity")
     graph.add_edge("identity", "domain")
-    graph.add_edge("domain", "recruiter")
+    graph.add_edge("domain", "recruitment")
 
     # Decision layer
-    graph.add_edge("recruiter", "risk_manager")
+    graph.add_edge("recruitment", "risk_manager")
 
     # Report generation
     graph.add_edge("risk_manager", "report")

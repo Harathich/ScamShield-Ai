@@ -14,7 +14,7 @@ from app.agents.threat.agent import ThreatAgent
 from app.agents.language.agent import LanguageAgent
 from app.agents.identity.agent import IdentityAgent
 from app.agents.domain.agent import DomainAgent
-from app.agents.recruiter.agent import RecruiterAgent
+from app.agents.recruitment.agent import RecruitmentAgent
 from app.agents.risk_manager.agent import RiskManager
 from app.agents.report_generator.agent import ReportGenerator
 
@@ -94,20 +94,20 @@ def domain_node(state: ScamShieldState) -> dict:
         return {"domain_result": {"agent": "domain", "error": str(e)}}
 
 
-def recruiter_node(state: ScamShieldState) -> dict:
+def recruitment_node(state: ScamShieldState) -> dict:
     """
-    Run the Recruiter Agent on the input text.
+    Run the Recruitment Agent on the input text.
 
-    This agent analyzes job/recruitment scam indicators.
+    This agent analyzes job/recruitment scam indicators and job detail consistency.
     It runs on all inputs — the agent itself determines
     whether the content is recruitment-related.
     """
     try:
-        agent = RecruiterAgent()
+        agent = RecruitmentAgent()
         result = agent.analyze(state["input_text"])
-        return {"recruiter_result": result}
+        return {"recruitment_result": result}
     except Exception as e:
-        return {"recruiter_result": {"agent": "recruiter", "error": str(e)}}
+        return {"recruitment_result": {"agent": "recruitment", "error": str(e)}}
 
 
 def risk_manager_node(state: ScamShieldState) -> dict:
@@ -122,7 +122,7 @@ def risk_manager_node(state: ScamShieldState) -> dict:
         "language": state.get("language_result"),
         "identity": state.get("identity_result"),
         "domain": state.get("domain_result"),
-        "recruiter": state.get("recruiter_result"),
+        "recruitment": state.get("recruitment_result"),
     }
 
     try:
@@ -156,7 +156,7 @@ def report_node(state: ScamShieldState) -> dict:
         "language_result": state.get("language_result"),
         "identity_result": state.get("identity_result"),
         "domain_result": state.get("domain_result"),
-        "recruiter_result": state.get("recruiter_result"),
+        "recruitment_result": state.get("recruitment_result"),
         "risk_manager_result": state.get("risk_manager_result"),
     }
 

@@ -12,13 +12,12 @@ Scoring strategy:
 
 
 # Agent weights — how much each agent's score contributes to the overall.
-# These can be tuned as the system matures.
 AGENT_WEIGHTS = {
-    "threat":    0.30,
-    "language":  0.20,
-    "identity":  0.20,
-    "domain":    0.20,
-    "recruiter": 0.10,
+    "threat":      0.30,
+    "language":    0.20,
+    "identity":    0.20,
+    "domain":      0.20,
+    "recruitment": 0.10,
 }
 
 
@@ -47,7 +46,7 @@ class RiskManager:
                 "language": { ... },
                 "identity": { ... },
                 "domain": { ... },
-                "recruiter": { ... },   # may be None/skipped
+                "recruitment": { ... },
             }
 
         Returns:
@@ -88,7 +87,15 @@ class RiskManager:
                 continue
 
             level = result.get("threat_level", result.get("risk_level", ""))
-            confidence = result.get("confidence", 70)  # default 70 if not provided
+            if isinstance(level, str):
+                level = level.upper()
+
+            # Handle confidence whether 0.0-1.0 or 0-100
+            raw_conf = result.get("confidence", 70)
+            if isinstance(raw_conf, float) and raw_conf <= 1.0:
+                confidence = round(raw_conf * 100)
+            else:
+                confidence = int(raw_conf)
 
             agent_scores[agent_name] = {
                 "risk_score": score,
@@ -119,8 +126,9 @@ class RiskManager:
                     factor += result.get("verification_status", "Identity concern")
                 elif agent_name == "domain":
                     factor += f"Domain risk score {score}"
-                elif agent_name == "recruiter":
-                    factor += result.get("recruitment_legitimacy", "Recruitment concern")
+                elif agent_name == "recruitment":
+                    red_flags = result.get("recruitment_red_flags", [])
+                    factor += ", ".join(red_flags[:2]) if red_flags else result.get("reason", "Recruitment anomalies")
                 contributing_factors.append(factor)
 
         # Calculate overall score

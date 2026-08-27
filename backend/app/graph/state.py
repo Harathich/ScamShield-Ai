@@ -22,7 +22,7 @@ class ScamShieldState(TypedDict):
     language_result: Optional[dict]
     identity_result: Optional[dict]
     domain_result: Optional[dict]
-    recruiter_result: Optional[dict]
+    recruitment_result: Optional[dict]
 
     # --- Risk Manager Output ---
     risk_manager_result: Optional[dict]

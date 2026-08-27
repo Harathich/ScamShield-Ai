@@ -28,4 +28,4 @@ class FullAnalysisResponse(BaseModel):
     language_result: Optional[dict] = None
     identity_result: Optional[dict] = None
     domain_result: Optional[dict] = None
-    recruiter_result: Optional[dict] = None
+    recruitment_result: Optional[dict] = None
