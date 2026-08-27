@@ -13,9 +13,12 @@ from typing_extensions import TypedDict
 class ScamShieldState(TypedDict):
     """State that flows through the ScamShield analysis pipeline."""
 
-    # --- Inputs ---
+    # --- Raw Inputs ---
     input_text: str
     input_url: Optional[str]
+
+    # --- Preprocessed / Normalized Content ---
+    normalized_content: Optional[dict]
 
     # --- Agent Results ---
     threat_result: Optional[dict]

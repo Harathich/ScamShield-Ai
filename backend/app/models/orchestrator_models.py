@@ -1,11 +1,43 @@
-from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Dict, Any, List
+from pydantic import BaseModel, Field, model_validator
 
 
 class FullAnalysisRequest(BaseModel):
-    """Request model for the full multi-agent analysis pipeline."""
-    text: str
+    """
+    Highly flexible request model. Accepts any common field name for input text.
+    Examples:
+      - {"text": "..."}
+      - {"message": "..."}
+      - {"content": "..."}
+      - {"body": "..."}
+      - {"url": "..."}
+    """
+    text: Optional[str] = None
+    message: Optional[str] = None
+    content: Optional[str] = None
+    body: Optional[str] = None
+    raw_input: Optional[str] = None
     url: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def extract_any_text(cls, values: Any) -> Any:
+        if isinstance(values, str):
+            return {"text": values}
+        if isinstance(values, dict):
+            # Resolve whichever key the user provided
+            text = (
+                values.get("text")
+                or values.get("message")
+                or values.get("content")
+                or values.get("body")
+                or values.get("raw_input")
+                or values.get("input")
+                or values.get("prompt")
+                or ""
+            )
+            values["text"] = str(text)
+        return values
 
 
 class AgentSummary(BaseModel):
@@ -16,13 +48,22 @@ class AgentSummary(BaseModel):
     error: Optional[str] = None
 
 
+class NormalizedMetadata(BaseModel):
+    """Metadata extracted by the Content Preprocessor."""
+    detected_format: str
+    extracted_urls: List[str] = Field(default_factory=list)
+    extracted_emails: List[str] = Field(default_factory=list)
+    extracted_phones: List[str] = Field(default_factory=list)
+
+
 class FullAnalysisResponse(BaseModel):
     """Response model for the full multi-agent analysis pipeline."""
     overall_risk_score: int = Field(ge=0, le=100)
     overall_threat_level: str
-    contributing_factors: list[str] = []
+    contributing_factors: List[str] = Field(default_factory=list)
     confidence: int = Field(ge=0, le=100, default=0)
-    agent_summary: dict[str, AgentSummary]
+    normalized_metadata: Optional[NormalizedMetadata] = None
+    agent_summary: Dict[str, AgentSummary]
     report: Optional[dict] = None
     threat_result: Optional[dict] = None
     language_result: Optional[dict] = None
