@@ -2,13 +2,12 @@
 LangGraph workflow definition for the ScamShield multi-agent pipeline.
 
 Graph structure:
-    START → threat → language → identity → domain → aggregate → END
+    START → threat → language → identity → domain → recruiter
+         → risk_manager → report → END
 
 Each agent runs sequentially. The domain node auto-skips if no URL
-is found. The aggregate node produces the overall risk assessment.
-
-When the Risk Manager agent is built, it will replace the aggregate
-node's placeholder scoring logic.
+is found. The Risk Manager aggregates all agent scores. The Report
+Generator produces a user-friendly explanation.
 """
 
 from langgraph.graph import StateGraph, END
@@ -19,7 +18,9 @@ from app.graph.nodes import (
     language_node,
     identity_node,
     domain_node,
-    aggregate_node,
+    recruiter_node,
+    risk_manager_node,
+    report_node,
 )
 
 
@@ -33,15 +34,24 @@ def build_workflow():
     graph.add_node("language", language_node)
     graph.add_node("identity", identity_node)
     graph.add_node("domain", domain_node)
-    graph.add_node("aggregate", aggregate_node)
+    graph.add_node("recruiter", recruiter_node)
+    graph.add_node("risk_manager", risk_manager_node)
+    graph.add_node("report", report_node)
 
     # Define edges (sequential pipeline)
+    # Analysis agents
     graph.set_entry_point("threat")
     graph.add_edge("threat", "language")
     graph.add_edge("language", "identity")
     graph.add_edge("identity", "domain")
-    graph.add_edge("domain", "aggregate")
-    graph.add_edge("aggregate", END)
+    graph.add_edge("domain", "recruiter")
+
+    # Decision layer
+    graph.add_edge("recruiter", "risk_manager")
+
+    # Report generation
+    graph.add_edge("risk_manager", "report")
+    graph.add_edge("report", END)
 
     return graph.compile()
 

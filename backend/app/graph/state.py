@@ -22,8 +22,15 @@ class ScamShieldState(TypedDict):
     language_result: Optional[dict]
     identity_result: Optional[dict]
     domain_result: Optional[dict]
+    recruiter_result: Optional[dict]
 
-    # --- Aggregated Output ---
+    # --- Risk Manager Output ---
+    risk_manager_result: Optional[dict]
+
+    # --- Report Generator Output ---
+    report: Optional[dict]
+
+    # --- Aggregated Output (from Risk Manager) ---
     overall_risk_score: Optional[int]
     overall_threat_level: Optional[str]
     agent_summary: Optional[dict]

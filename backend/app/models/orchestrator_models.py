@@ -20,8 +20,12 @@ class FullAnalysisResponse(BaseModel):
     """Response model for the full multi-agent analysis pipeline."""
     overall_risk_score: int = Field(ge=0, le=100)
     overall_threat_level: str
+    contributing_factors: list[str] = []
+    confidence: int = Field(ge=0, le=100, default=0)
     agent_summary: dict[str, AgentSummary]
+    report: Optional[dict] = None
     threat_result: Optional[dict] = None
     language_result: Optional[dict] = None
     identity_result: Optional[dict] = None
     domain_result: Optional[dict] = None
+    recruiter_result: Optional[dict] = None

@@ -14,6 +14,9 @@ from app.agents.threat.agent import ThreatAgent
 from app.agents.language.agent import LanguageAgent
 from app.agents.identity.agent import IdentityAgent
 from app.agents.domain.agent import DomainAgent
+from app.agents.recruiter.agent import RecruiterAgent
+from app.agents.risk_manager.agent import RiskManager
+from app.agents.report_generator.agent import ReportGenerator
 
 
 # ---------------------------------------------------------------------------
@@ -91,50 +94,75 @@ def domain_node(state: ScamShieldState) -> dict:
         return {"domain_result": {"agent": "domain", "error": str(e)}}
 
 
-def aggregate_node(state: ScamShieldState) -> dict:
+def recruiter_node(state: ScamShieldState) -> dict:
     """
-    Combine individual agent results into an overall risk assessment.
+    Run the Recruiter Agent on the input text.
 
-    Scoring logic (placeholder until Risk Manager is built):
-    - Collects risk_score from each agent that returned one
-    - Overall score = maximum individual score (worst-case signal)
-    - Overall threat level derived from the overall score
+    This agent analyzes job/recruitment scam indicators.
+    It runs on all inputs — the agent itself determines
+    whether the content is recruitment-related.
     """
-    scores = []
+    try:
+        agent = RecruiterAgent()
+        result = agent.analyze(state["input_text"])
+        return {"recruiter_result": result}
+    except Exception as e:
+        return {"recruiter_result": {"agent": "recruiter", "error": str(e)}}
 
-    for key in ["threat_result", "language_result", "identity_result", "domain_result"]:
-        result = state.get(key)
-        if result and isinstance(result, dict) and "risk_score" in result:
-            scores.append(result["risk_score"])
 
-    if scores:
-        overall_score = max(scores)
-    else:
-        overall_score = 0
+def risk_manager_node(state: ScamShieldState) -> dict:
+    """
+    Run the Risk Manager to aggregate all agent results.
 
-    if overall_score >= 76:
-        level = "CRITICAL"
-    elif overall_score >= 51:
-        level = "HIGH"
-    elif overall_score >= 26:
-        level = "MEDIUM"
-    else:
-        level = "LOW"
-
-    summary = {}
-    for key in ["threat_result", "language_result", "identity_result", "domain_result"]:
-        result = state.get(key)
-        if result and isinstance(result, dict):
-            agent_name = key.replace("_result", "")
-            summary[agent_name] = {
-                "risk_score": result.get("risk_score", None),
-                "threat_level": result.get("threat_level", result.get("risk_level", None)),
-                "skipped": result.get("skipped", False),
-                "error": result.get("error", None),
-            }
-
-    return {
-        "overall_risk_score": overall_score,
-        "overall_threat_level": level,
-        "agent_summary": summary,
+    Collects results from all agents, computes weighted overall
+    risk score, and determines the overall threat level.
+    """
+    agent_results = {
+        "threat": state.get("threat_result"),
+        "language": state.get("language_result"),
+        "identity": state.get("identity_result"),
+        "domain": state.get("domain_result"),
+        "recruiter": state.get("recruiter_result"),
     }
+
+    try:
+        risk_manager = RiskManager()
+        result = risk_manager.evaluate(agent_results)
+        return {
+            "risk_manager_result": result,
+            "overall_risk_score": result["overall_risk_score"],
+            "overall_threat_level": result["overall_threat_level"],
+            "agent_summary": result["agent_scores"],
+        }
+    except Exception as e:
+        return {
+            "risk_manager_result": {"error": str(e)},
+            "overall_risk_score": 0,
+            "overall_threat_level": "LOW",
+            "agent_summary": {},
+        }
+
+
+def report_node(state: ScamShieldState) -> dict:
+    """
+    Run the Report Generator to produce a user-friendly report.
+
+    Feeds all agent results + Risk Manager output to the LLM
+    to generate a plain-language security report.
+    """
+    analysis_data = {
+        "input_text": state["input_text"],
+        "threat_result": state.get("threat_result"),
+        "language_result": state.get("language_result"),
+        "identity_result": state.get("identity_result"),
+        "domain_result": state.get("domain_result"),
+        "recruiter_result": state.get("recruiter_result"),
+        "risk_manager_result": state.get("risk_manager_result"),
+    }
+
+    try:
+        generator = ReportGenerator()
+        report = generator.generate(analysis_data)
+        return {"report": report}
+    except Exception as e:
+        return {"report": {"agent": "report_generator", "error": str(e)}}
