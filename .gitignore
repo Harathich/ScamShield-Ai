@@ -5,3 +5,4 @@ venv/
 .venv/
 .env.*
 backend.zip
+.codex-backups/
