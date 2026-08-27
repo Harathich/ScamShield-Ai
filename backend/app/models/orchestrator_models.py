@@ -1,42 +1,69 @@
+import json
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field, model_validator
 
 
 class FullAnalysisRequest(BaseModel):
     """
-    Highly flexible request model. Accepts any common field name for input text.
-    Examples:
-      - {"text": "..."}
-      - {"message": "..."}
-      - {"content": "..."}
-      - {"body": "..."}
-      - {"url": "..."}
+    Universal flexible request model.
+    Accepts ANY payload format:
+      - Plain text string
+      - Standard keys: {"text": "..."}
+      - OCR output JSON: {"extracted_text": "...", "confidence": ...}
+      - Alternative keys: {"message": "...", "content": "...", "body": "...", "ocr_text": "..."}
+      - Arbitrary dict: automatically extracts the longest text string
     """
     text: Optional[str] = None
-    message: Optional[str] = None
-    content: Optional[str] = None
-    body: Optional[str] = None
-    raw_input: Optional[str] = None
     url: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod
     def extract_any_text(cls, values: Any) -> Any:
         if isinstance(values, str):
-            return {"text": values}
+            # If input is a raw JSON string like '{"extracted_text": "..."}'
+            try:
+                parsed = json.loads(values)
+                if isinstance(parsed, dict):
+                    values = parsed
+                else:
+                    return {"text": values}
+            except Exception:
+                return {"text": values}
+
         if isinstance(values, dict):
-            # Resolve whichever key the user provided
+            # 1. Check direct common text fields including OCR outputs
             text = (
                 values.get("text")
+                or values.get("extracted_text")
+                or values.get("ocr_text")
                 or values.get("message")
                 or values.get("content")
                 or values.get("body")
                 or values.get("raw_input")
+                or values.get("raw_text")
+                or values.get("clean_text")
                 or values.get("input")
+                or values.get("data")
                 or values.get("prompt")
-                or ""
+                or values.get("description")
             )
-            values["text"] = str(text)
+
+            # 2. If not found in common keys, search all string values and pick the longest
+            if not text:
+                string_vals = [
+                    v for k, v in values.items() 
+                    if isinstance(v, str) and k.lower() not in ("url", "error", "language", "status", "type")
+                ]
+                if string_vals:
+                    text = max(string_vals, key=len)
+
+            url = values.get("url") or values.get("link") or values.get("website")
+
+            return {
+                "text": str(text).strip() if text else "",
+                "url": str(url).strip() if url else None
+            }
+
         return values
 
 
