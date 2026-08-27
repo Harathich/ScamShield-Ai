@@ -5,6 +5,7 @@ from app.routes.analyze import router as analyze_router
 from app.routes.analyze_domain import router as analyze_domain_router
 from app.routes.language import router as language_router
 from app.routes.identity import router as identity_router
+from app.routes.orchestrator import router as orchestrator_router
 
 app = FastAPI(
     title="ScamShield AI Backend",
@@ -23,6 +24,7 @@ app.include_router(analyze_router)
 app.include_router(analyze_domain_router)
 app.include_router(language_router)
 app.include_router(identity_router)
+app.include_router(orchestrator_router)
 
 
 @app.get("/")
