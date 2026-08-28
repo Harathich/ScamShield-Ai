@@ -7,7 +7,7 @@ You will receive structured technical findings regarding a URL (extracted via WH
 Your job is to:
 1. Interpret this evidence.
 2. Determine a `risk_score` (0-100, where 100 is highly malicious).
-3. Determine a `risk_level` (Low, Medium, High).
+3. Determine a `risk_level` (LOW, MEDIUM, HIGH, CRITICAL).
 4. Provide a clear, human-readable `explanation` of your findings.
 5. Provide a `recommendation` for the user.
 
@@ -29,7 +29,7 @@ Your job is to:
 Return ONLY a raw JSON string (no markdown formatting, no code blocks). The JSON must have the following keys:
 - `agent`: "domain"
 - `risk_score`: Integer (0-100)
-- `risk_level`: String ("Low", "Medium", "High")
+- `risk_level`: String ("LOW", "MEDIUM", "HIGH", "CRITICAL")
 - `domain`: String (The analyzed domain)
 - `domain_age`: String (Extracted domain age)
 - `ssl_status`: String (Valid/Invalid/Unknown)

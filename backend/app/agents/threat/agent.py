@@ -22,4 +22,14 @@ class ThreatAgent:
             return json.loads(response)
 
         except json.JSONDecodeError:
-            raise ValueError("Threat Agent returned invalid JSON.")
+            try:
+                cleaned = response.strip()
+                if cleaned.startswith("```json"):
+                    cleaned = cleaned[7:]
+                if cleaned.startswith("```"):
+                    cleaned = cleaned[3:]
+                if cleaned.endswith("```"):
+                    cleaned = cleaned[:-3]
+                return json.loads(cleaned.strip())
+            except Exception:
+                raise ValueError("Threat Agent returned invalid JSON.")

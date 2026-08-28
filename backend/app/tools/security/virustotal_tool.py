@@ -1,12 +1,8 @@
 import base64
-import requests
-import os
+import httpx
 
-# Assume config/settings.py has VIRUSTOTAL_API_KEY, but fallback to os.getenv if missing
-try:
-    from app.config.settings import VIRUSTOTAL_API_KEY
-except ImportError:
-    VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY")
+from app.config.settings import VIRUSTOTAL_API_KEY
+
 
 class VirusTotalTool:
     """
@@ -16,10 +12,13 @@ class VirusTotalTool:
     BASE_URL = "https://www.virustotal.com/api/v3"
 
     def __init__(self):
-        self.api_key = VIRUSTOTAL_API_KEY
-        self.headers = {}
-        if self.api_key:
-            self.headers["x-apikey"] = self.api_key
+
+        if not VIRUSTOTAL_API_KEY:
+            raise ValueError("VirusTotal API Key is missing.")
+
+        self.headers = {
+            "x-apikey": VIRUSTOTAL_API_KEY
+        }
 
     @staticmethod
     def _encode_url(url: str) -> str:
@@ -30,24 +29,14 @@ class VirusTotalTool:
         return encoded
 
     def analyze_url(self, url: str) -> dict:
-        if not self.api_key:
-            return {
-                "known": False,
-                "malicious": 0,
-                "suspicious": 0,
-                "harmless": 0,
-                "undetected": 0,
-                "error": "VirusTotal API Key is missing. Reputation data unavailable."
-            }
 
         try:
             url_id = self._encode_url(url)
-            
-            # This is an external API call to VirusTotal, so SSRF restrictions for internal IPs don't apply to this specific outbound request to www.virustotal.com
-            response = requests.get(
+
+            response = httpx.get(
                 f"{self.BASE_URL}/urls/{url_id}",
                 headers=self.headers,
-                timeout=10,
+                timeout=30,
             )
 
             # If VirusTotal has never seen this URL
@@ -61,6 +50,7 @@ class VirusTotalTool:
                 }
 
             response.raise_for_status()
+
             data = response.json()
             stats = data["data"]["attributes"]["last_analysis_stats"]
 
