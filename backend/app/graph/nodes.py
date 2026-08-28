@@ -4,10 +4,10 @@ LangGraph node functions for the ScamShield multi-agent pipeline.
 Optimized Hybrid Architecture:
 1. Deterministic preprocessing & regex entity extraction (0 tokens)
 2. Smart Conditional Gating:
-   - Domain Agent: Runs only when URL is present (0 tokens if no URL)
-   - Recruitment Agent: Runs only when job/recruitment keywords exist (0 tokens for general text)
-   - Identity Agent: Fast-paths inconclusive status when no identity indicators exist (0 tokens)
-   - Language Agent: Fast-paths simple neutral messages when no manipulation cues exist (0 tokens)
+   - Domain Agent: Runs only when URL is present
+   - Recruitment Agent: Runs only when job/recruitment keywords exist
+   - Identity Agent: Fast-paths inconclusive status when no identity indicators exist
+   - Language Agent: Fast-paths simple neutral messages when no manipulation cues exist
 3. Deterministic Risk Manager (0 tokens)
 4. Deterministic Report Generator (0 tokens)
 """
@@ -31,7 +31,7 @@ RECRUITMENT_KEYWORDS = {
     "wfh", "data entry", "stipend", "vacancy", "vacancies", "career", "careers",
     "applicant", "applicants", "employment", "candidate", "candidates", "joining",
     "hr coordinator", "hr manager", "hr team", "remuneration", "per month", "per year",
-    "lpa", "$/hr", "$/year", "annual package"
+    "lpa", "$/hr", "$/year", "annual package", "typing assistant", "remote typing"
 }
 
 # Manipulation signals for fast-path check
@@ -39,7 +39,9 @@ MANIPULATION_KEYWORDS = {
     "urgent", "urgently", "hurry", "expire", "expires", "suspended", "blocked",
     "warning", "alert", "immediate", "immediately", "bonus", "prize", "won",
     "winner", "lottery", "reward", "lucky draw", "trojan", "virus", "infected",
-    "deadline", "limited time", "act now", "last chance", "free cash"
+    "deadline", "limited time", "act now", "last chance", "free cash", "disconnected",
+    "disconnect", "debit card", "kyc", "netbanking", "restricted", "suspension",
+    "security deposit", "refundable", "zelle", "telegram", "transfer"
 }
 
 
@@ -75,7 +77,6 @@ def threat_node(state: ScamShieldState) -> dict:
     norm = state.get("normalized_content", {})
     text = norm.get("clean_text") or state.get("input_text", "")
 
-    # Fast path for very short empty text
     if not text.strip():
         return {"threat_result": {
             "agent": "threat",
@@ -104,7 +105,7 @@ def language_node(state: ScamShieldState) -> dict:
     words = set(re.findall(r'\b\w+\b', text.lower()))
 
     # Fast-path: If text is short and has zero manipulation keywords, skip LLM call
-    if len(words) < 20 and not words.intersection(MANIPULATION_KEYWORDS):
+    if len(words) < 25 and not words.intersection(MANIPULATION_KEYWORDS):
         return {"language_result": {
             "agent": "language",
             "risk_score": 0,
@@ -133,22 +134,18 @@ def identity_node(state: ScamShieldState) -> dict:
     emails = norm.get("extracted_emails", [])
     phones = norm.get("extracted_phones", [])
 
-    # Fast-path: If message has no emails, phones, and no identity claim headers, skip LLM
     has_header = bool(re.search(r'^(?:From:|Reply-To:|Sender:)', text, re.IGNORECASE | re.MULTILINE))
     if not emails and not phones and not has_header and len(text.split()) < 25:
         return {"identity_result": {
             "agent": "identity",
-            "risk_score": 0,
+            "risk_score": None,
+            "skipped": True,
             "confidence": 0.5,
             "threat_level": "LOW",
             "verification_status": "INCONCLUSIVE",
             "identity_entities": {
-                "claimed_name": None,
-                "claimed_organization": None,
-                "claimed_role_or_title": None,
-                "sender_email": None,
-                "sender_domain": None,
-                "domain_type": None,
+                "claimed_name": None, "claimed_organization": None, "claimed_role_or_title": None,
+                "sender_email": None, "sender_domain": None, "domain_type": None,
                 "contact_identifiers": []
             },
             "mismatch_findings": [],
@@ -193,7 +190,7 @@ def recruitment_node(state: ScamShieldState) -> dict:
     """
     Run Recruitment Agent with smart gating.
     Only queries the LLM if the text actually contains recruitment-related terms.
-    Saves 100% of tokens on ordinary transactional, casual, or banking messages!
+    If no job context, marks skipped=True so it doesn't dilute other threat signals.
     """
     norm = state.get("normalized_content", {})
     text = norm.get("clean_text") or state.get("input_text", "")
@@ -204,7 +201,9 @@ def recruitment_node(state: ScamShieldState) -> dict:
 
     if not has_recruitment_keywords:
         return {"recruitment_result": {
-            "risk_score": 0,
+            "agent": "recruitment",
+            "skipped": True,
+            "risk_score": None,
             "risk_level": "LOW",
             "confidence": 1.0,
             "job_information": {

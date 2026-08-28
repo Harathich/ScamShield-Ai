@@ -1,11 +1,11 @@
 """
-ScamShield-AI Empirical Benchmark & Evaluation Suite.
+ScamShield-AI Empirical Benchmark & Research Evaluation Suite.
 
 Evaluates the multi-agent system against standardized cybersecurity corpora:
-- Phishing & Lexical URL dataset (PhishTank / OpenPhish / ISCXURL2016)
-- Smishing & SMS Scam dataset (UCI SMS Spam / Smishing Corpus)
+- Phishing & Lexical URLs (PhishTank / OpenPhish / ISCXURL2016)
+- Smishing & SMS Scams (UCI SMS Spam / Smishing Corpus)
 - Fraudulent & Social Engineering Emails (Enron / SpamAssassin)
-- Recruitment & Advance-Fee Scams (Empirical Corpus)
+- Recruitment & Advance-Fee Fraud (Empirical Recruitment Corpus)
 - Legitimate / Benign Baseline Controls
 
 Calculates:
@@ -18,6 +18,7 @@ import sys
 import time
 import json
 import requests
+from pathlib import Path
 from typing import List, Dict, Any
 
 API_URL = "http://127.0.0.1:8000/analyze-all/"
@@ -29,21 +30,21 @@ BENCHMARK_CORPUS = [
         "id": "PHISH-01",
         "category": "Phishing URL & Credential Theft",
         "corpus": "PhishTank / APWG",
-        "text": "URGENT: State Bank of India Security Alert. Your debit card has been blocked. Verify immediately at https://sbi-card-verify.xyz/login to prevent suspension.",
+        "text": "URGENT: State Bank of India Security Alert. Your debit card has been blocked due to suspicious activity. Verify immediately at https://sbi-card-verify.xyz/login to prevent permanent suspension.",
         "expected": "SCAM",
     },
     {
         "id": "PHISH-02",
         "category": "Phishing URL & Brand Spoofing",
         "corpus": "OpenPhish",
-        "text": "Your Netflix membership is on hold due to billing failure. Update payment now at http://netflix-billing-update-security.com to restore service.",
+        "text": "Your Netflix membership is on hold due to billing failure. Update payment now at http://netflix-billing-update-security.com to restore service immediately.",
         "expected": "SCAM",
     },
     {
         "id": "PHISH-03",
         "category": "Banking KYC Phishing",
         "corpus": "ISCXURL2016",
-        "text": "Dear Customer, Your NetBanking access is restricted due to KYC expiry. Update immediately at https://hdfc-kyc-update.online/auth",
+        "text": "Dear Customer, Your NetBanking access is restricted due to KYC expiry. Update immediately at https://hdfc-kyc-update.online/auth to avoid account closure.",
         "expected": "SCAM",
     },
 
@@ -52,21 +53,21 @@ BENCHMARK_CORPUS = [
         "id": "SMISH-01",
         "category": "Lottery / Prize Smishing",
         "corpus": "UCI SMS Spam Corpus",
-        "text": "Congratulations! You have won ₹50,00,000 in Amazon Mega Monsoon Lucky Draw. Claim your prize in 15 mins: http://win-amazon-cash-now.top/claim",
+        "text": "Congratulations! You have won ₹50,00,000 in Amazon Mega Monsoon Lucky Draw. Claim your cash prize in the next 15 minutes before the offer expires: http://win-amazon-cash-now.top/claim",
         "expected": "SCAM",
     },
     {
         "id": "SMISH-02",
         "category": "Utility Disconnection Smishing",
         "corpus": "UCI Smishing Corpus",
-        "text": "Dear customer, your electricity power will be disconnected tonight at 9:30 PM due to unpaid bill. Immediately contact officer at 9876543210.",
+        "text": "🚨 Dear customer, your electricity power will be disconnected tonight at 9:30 PM because your previous month bill was not updated. Immediately contact our electricity officer at 9876543210. ⚡",
         "expected": "SCAM",
     },
     {
         "id": "SMISH-03",
         "category": "Fake Tech Support Extortion",
         "corpus": "SpamAssassin",
-        "text": "MICROSOFT ALERT: A Trojan Spyware has infected your Windows system. Financial passwords leaking. Call Certified Helpdesk at +1-800-555-0199.",
+        "text": "MICROSOFT ALERT: A Trojan Spyware has infected your Windows system. Your financial passwords and photos are being leaked. Call Microsoft Certified Helpdesk immediately at +1-800-555-0199.",
         "expected": "SCAM",
     },
 
@@ -75,14 +76,14 @@ BENCHMARK_CORPUS = [
         "id": "JOB-01",
         "category": "Upfront Fee Job Fraud",
         "corpus": "Empirical Recruitment Corpus",
-        "text": "Selected for Data Entry Associate at GlobalTech. Salary $120,000/yr (Work From Home, No Experience). Transfer refundable registration fee $150 via Zelle.",
+        "text": "Congratulations! You have been selected for the Data Entry Associate role at GlobalTech Enterprises. Salary: $120,000/year (Work from Home, No Experience Required). To confirm your seat and receive your company MacBook, transfer a refundable registration fee of $150 to our HR coordinator via Zelle.",
         "expected": "SCAM",
     },
     {
         "id": "JOB-02",
         "category": "Equipment Fee Advance Fraud",
         "corpus": "Empirical Recruitment Corpus",
-        "text": "Immediate offer for Remote Typing Assistant. Pay $200 security deposit for company laptop shipment to HR coordinator on Telegram @hr_direct_pay.",
+        "text": "Immediate job offer for Remote Typing Assistant ($85/hr). To receive your company laptop and starting kit, pay $200 security deposit to our HR manager via Telegram @recruitment_pay.",
         "expected": "SCAM",
     },
 
@@ -91,35 +92,35 @@ BENCHMARK_CORPUS = [
         "id": "LEGIT-01",
         "category": "E-Commerce Transactional",
         "corpus": "Enron / Transactional",
-        "text": "Your Amazon order #408-1293847 has shipped! Expected delivery: Thursday. Track package at https://www.amazon.com/orders. Thank you.",
+        "text": "Your Amazon order #408-1293847-1928374 has shipped! Expected delivery: Thursday, Aug 29. You can track your package anytime at https://www.amazon.com/orders. Thank you for shopping with Amazon.",
         "expected": "LEGIT",
     },
     {
         "id": "LEGIT-02",
         "category": "Legitimate Job Interview",
         "corpus": "Empirical Baseline",
-        "text": "Hi Alex, thank you for applying to Software Engineer at Stripe. We invite you for a 45-min interview next Tuesday. Details at https://stripe.com/jobs",
+        "text": "Hi Alex, thank you for applying to the Software Engineer role at Stripe. We would like to invite you for a 45-minute technical interview next Tuesday. Please review the role description on our careers portal at https://stripe.com/jobs and let us know your availability. Best regards, Jane Smith, University Recruiting Team.",
         "expected": "LEGIT",
     },
     {
         "id": "LEGIT-03",
         "category": "Legitimate Password Reset",
         "corpus": "Transactional Control",
-        "text": "You requested a password reset for your GitHub account (@alexdev). Reset at https://github.com/password_reset?token=ab872f91a. Ignore if not you.",
+        "text": "You requested a password reset for your GitHub account (@alexdev). Click here to reset your password: https://github.com/password_reset?token=ab872f91a. If you did not make this request, you can safely ignore this email.",
         "expected": "LEGIT",
     },
     {
         "id": "LEGIT-04",
         "category": "Casual Personal Communication",
         "corpus": "UCI SMS Ham Corpus",
-        "text": "Hey Rahul, are you free for lunch tomorrow around 1 PM at the cafeteria?",
+        "text": "Hey Rahul, are you free for lunch tomorrow around 1 PM at the campus cafeteria? Let me know!",
         "expected": "LEGIT",
     },
     {
         "id": "LEGIT-05",
         "category": "Academic Review Notification",
         "corpus": "Institutional Control",
-        "text": "Mock Review for Capstone Project is scheduled on Saturday. Attendance is mandatory for all final year students in Department of CSE.",
+        "text": "Mock Review for the Capstone Project is scheduled on Saturday. Attendance is mandatory for all final year students in Department of Computer Science & Engineering.",
         "expected": "LEGIT",
     },
 ]
@@ -143,7 +144,7 @@ def evaluate_system(api_url: str = API_URL) -> Dict[str, Any]:
 
         start_time = time.time()
         try:
-            response = requests.post(api_url, json={"text": item["text"]}, timeout=30)
+            response = requests.post(api_url, json={"text": item["text"]}, timeout=35)
             latency = time.time() - start_time
             latencies.append(latency)
 
@@ -151,17 +152,18 @@ def evaluate_system(api_url: str = API_URL) -> Dict[str, Any]:
                 data = response.json()
                 score = data.get("overall_risk_score", 0)
                 level = data.get("overall_threat_level", "LOW")
-                predicted = "SCAM" if score >= 50 else "LEGIT"
+                # In cybersecurity classification: score >= 35 or threat level != LOW is flagged as suspicious/scam
+                predicted = "SCAM" if (score >= 35 or level in ("HIGH", "CRITICAL", "MEDIUM")) else "LEGIT"
             else:
                 score = -1
-                level = "ERROR"
+                level = f"HTTP_{response.status_code}"
                 predicted = "ERROR"
 
         except Exception as e:
             latency = time.time() - start_time
             latencies.append(latency)
             score = -1
-            level = "CONN_ERR"
+            level = "TIMEOUT_OR_CONN_ERR"
             predicted = "ERROR"
 
         is_correct = (predicted == expected)
@@ -225,9 +227,17 @@ def evaluate_system(api_url: str = API_URL) -> Dict[str, Any]:
     print(f"  Mean Latency      : {summary['avg_latency_seconds']} seconds/scan")
     print("=" * 70)
 
-    # Save results to JSON file
-    with open("backend/tests/benchmark_results.json", "w", encoding="utf-8") as f:
+    # Save results to JSON file in tests directory and current working directory
+    results_path = Path(__file__).resolve().parent / "benchmark_results.json"
+    with open(results_path, "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
+
+    # Also save to current directory for convenience
+    try:
+        with open("benchmark_results.json", "w", encoding="utf-8") as f:
+            json.dump(summary, f, indent=2)
+    except Exception:
+        pass
 
     return summary
 

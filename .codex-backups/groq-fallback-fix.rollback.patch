@@ -1,0 +1,15 @@
+This file records the rollback instructions for the Groq fallback fix applied on 2026-08-27.
+
+To restore the exact pre-fix versions of the changed files, run from the repository root:
+
+    git restore --source=HEAD -- backend/app/config/settings.py backend/app/services/llm/llm_service.py backend/app/agents/risk_manager/agent.py backend/app/utils/preprocessor.py backend/app/routes/orchestrator.py backend/app/agents/report_generator/agent.py backend/app/graph/nodes.py backend/app/prompts/report_generator/system_prompt.md
+
+Only use that command if the files have no later changes you want to keep.
+
+To restore the previous model setting in backend/.env, change:
+
+    GROQ_MODEL=openai/gpt-oss-20b
+
+back to:
+
+    GROQ_MODEL=llama-3.1-8b-instant
