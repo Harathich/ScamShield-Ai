@@ -1,125 +1,125 @@
 {
   "total_samples": 10,
   "true_positives": 0,
-  "true_negatives": 0,
-  "false_positives": 5,
+  "true_negatives": 5,
+  "false_positives": 0,
   "false_negatives": 5,
-  "accuracy": 0.0,
+  "accuracy": 50.0,
   "precision": 0.0,
   "recall": 0.0,
   "f1_score": 0.0,
-  "false_positive_rate": 100.0,
-  "avg_latency_seconds": 2.04,
+  "false_positive_rate": 0.0,
+  "avg_latency_seconds": 16.85,
   "detailed_results": [
     {
       "id": "PHISH-01",
       "category": "Banking Phishing & Credential Theft",
       "corpus": "PhishTank / APWG",
       "expected": "SCAM",
-      "predicted": "ERROR",
-      "risk_score": -1,
-      "threat_level": "TIMEOUT_OR_CONN_ERR",
+      "predicted": "LEGIT",
+      "risk_score": 0,
+      "threat_level": "UNKNOWN",
       "correct": false,
-      "latency_sec": 2.053
+      "latency_sec": 25.755
     },
     {
       "id": "PHISH-02",
       "category": "Brand Impersonation Phishing",
       "corpus": "OpenPhish",
       "expected": "SCAM",
-      "predicted": "ERROR",
-      "risk_score": -1,
-      "threat_level": "TIMEOUT_OR_CONN_ERR",
+      "predicted": "LEGIT",
+      "risk_score": 0,
+      "threat_level": "UNKNOWN",
       "correct": false,
-      "latency_sec": 2.052
+      "latency_sec": 15.064
     },
     {
       "id": "SMISH-01",
       "category": "Lottery & Prize Smishing",
       "corpus": "UCI SMS Spam Corpus",
       "expected": "SCAM",
-      "predicted": "ERROR",
-      "risk_score": -1,
-      "threat_level": "TIMEOUT_OR_CONN_ERR",
+      "predicted": "LEGIT",
+      "risk_score": 0,
+      "threat_level": "UNKNOWN",
       "correct": false,
-      "latency_sec": 2.052
+      "latency_sec": 21.347
     },
     {
       "id": "SMISH-02",
       "category": "Fake Tech Support Extortion",
       "corpus": "SpamAssassin",
       "expected": "SCAM",
-      "predicted": "ERROR",
-      "risk_score": -1,
-      "threat_level": "TIMEOUT_OR_CONN_ERR",
+      "predicted": "LEGIT",
+      "risk_score": 0,
+      "threat_level": "UNKNOWN",
       "correct": false,
-      "latency_sec": 2.045
+      "latency_sec": 14.025
     },
     {
       "id": "JOB-01",
       "category": "Advance-Fee Recruitment Fraud",
       "corpus": "Empirical Recruitment Corpus",
       "expected": "SCAM",
-      "predicted": "ERROR",
-      "risk_score": -1,
-      "threat_level": "TIMEOUT_OR_CONN_ERR",
+      "predicted": "LEGIT",
+      "risk_score": 0,
+      "threat_level": "UNKNOWN",
       "correct": false,
-      "latency_sec": 2.059
+      "latency_sec": 20.129
     },
     {
       "id": "LEGIT-01",
       "category": "E-Commerce Transactional",
       "corpus": "Enron / Transactional",
       "expected": "LEGIT",
-      "predicted": "ERROR",
-      "risk_score": -1,
-      "threat_level": "TIMEOUT_OR_CONN_ERR",
-      "correct": false,
-      "latency_sec": 2.038
+      "predicted": "LEGIT",
+      "risk_score": 0,
+      "threat_level": "UNKNOWN",
+      "correct": true,
+      "latency_sec": 19.525
     },
     {
       "id": "LEGIT-02",
       "category": "Legitimate Job Interview",
       "corpus": "Empirical Baseline",
       "expected": "LEGIT",
-      "predicted": "ERROR",
-      "risk_score": -1,
-      "threat_level": "TIMEOUT_OR_CONN_ERR",
-      "correct": false,
-      "latency_sec": 2.032
+      "predicted": "LEGIT",
+      "risk_score": 0,
+      "threat_level": "UNKNOWN",
+      "correct": true,
+      "latency_sec": 23.912
     },
     {
       "id": "LEGIT-03",
       "category": "Legitimate Password Reset",
       "corpus": "Transactional Control",
       "expected": "LEGIT",
-      "predicted": "ERROR",
-      "risk_score": -1,
-      "threat_level": "TIMEOUT_OR_CONN_ERR",
-      "correct": false,
-      "latency_sec": 2.031
+      "predicted": "LEGIT",
+      "risk_score": 0,
+      "threat_level": "UNKNOWN",
+      "correct": true,
+      "latency_sec": 19.669
     },
     {
       "id": "LEGIT-04",
       "category": "Casual Personal Message",
       "corpus": "UCI SMS Ham Corpus",
       "expected": "LEGIT",
-      "predicted": "ERROR",
-      "risk_score": -1,
-      "threat_level": "TIMEOUT_OR_CONN_ERR",
-      "correct": false,
-      "latency_sec": 2.058
+      "predicted": "LEGIT",
+      "risk_score": 0,
+      "threat_level": "LOW",
+      "correct": true,
+      "latency_sec": 4.923
     },
     {
       "id": "LEGIT-05",
       "category": "Academic Notice Notification",
       "corpus": "Institutional Control",
       "expected": "LEGIT",
-      "predicted": "ERROR",
-      "risk_score": -1,
-      "threat_level": "TIMEOUT_OR_CONN_ERR",
-      "correct": false,
-      "latency_sec": 2.022
+      "predicted": "LEGIT",
+      "risk_score": 0,
+      "threat_level": "LOW",
+      "correct": true,
+      "latency_sec": 4.11
     }
   ]
 }

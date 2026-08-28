@@ -21,6 +21,6 @@ _multi_keys = os.getenv("GROQ_API_KEYS", "")
 GROQ_API_KEYS = [k.strip() for k in f"{_single_key},{_multi_keys}".split(",") if k.strip()]
 GROQ_API_KEY = GROQ_API_KEYS[0] if GROQ_API_KEYS else None
 
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 MONGO_URI = os.getenv("MONGO_URI")
 VIRUSTOTAL_API_KEY = os.getenv("VIRUSTOTAL_API_KEY")
