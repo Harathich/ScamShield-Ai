@@ -21,6 +21,11 @@ import requests
 from pathlib import Path
 from typing import List, Dict, Any
 
+# Ensure backend directory is in sys.path
+backend_dir = Path(__file__).resolve().parent.parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
 API_URL = "http://127.0.0.1:8000/analyze-all/"
 
 # High-Signal Standardized Benchmark Dataset (Unambiguous Scams vs Legitimate)
@@ -101,12 +106,29 @@ BENCHMARK_CORPUS = [
 ]
 
 
+def check_server_health(api_url: str) -> bool:
+    """Verifies that the backend server is reachable before running tests."""
+    health_url = api_url.replace("/analyze-all/", "/health")
+    try:
+        res = requests.get(health_url, timeout=3.0)
+        return res.status_code == 200
+    except Exception:
+        return False
+
+
 def evaluate_system(api_url: str = API_URL) -> Dict[str, Any]:
     """Runs the full evaluation benchmark against the active API."""
     print("=" * 70)
     print("  ScamShield-AI Empirical Benchmark & Research Evaluation")
     print(f"  Target API: {api_url}")
     print("=" * 70)
+
+    # 1. Pre-flight health check
+    if not check_server_health(api_url):
+        print("\n❌ ERROR: FastAPI server is NOT running on http://127.0.0.1:8000!")
+        print("  Please start the backend server in another terminal:")
+        print("    uvicorn app.main:app --port 8000\n")
+        return {"error": "Server not running"}
 
     tp = fp = tn = fn = 0
     latencies: List[float] = []

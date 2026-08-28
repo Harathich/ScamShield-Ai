@@ -22,6 +22,7 @@ backend_dir = Path(__file__).resolve().parent.parent
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
+from app.config.settings import GROQ_API_KEY
 from app.graph.state import ScamShieldState
 from app.graph.nodes import (
     preprocess_node, threat_node, language_node,
@@ -96,6 +97,15 @@ def run_pipeline_with_ablation(text: str, ablate: str = "none") -> Dict[str, Any
 
 
 def evaluate_ablation():
+    print("=" * 75)
+    print("  ScamShield-AI Ablation Study: Component Impact Analysis")
+    print("=" * 75)
+
+    if not GROQ_API_KEY:
+        print("\n❌ ERROR: GROQ_API_KEY is missing!")
+        print("  Please ensure GROQ_API_KEY is present in your .env file in the project folder.\n")
+        return
+
     configs = [
         ("Full Multi-Agent System (All Agents)", "none"),
         ("Without Domain Agent (No WHOIS/VT)", "no_domain"),
@@ -103,10 +113,6 @@ def evaluate_ablation():
         ("Without Identity Agent (No Brand Spoof)", "no_identity"),
         ("Without Critical Override (Pure Average)", "no_override"),
     ]
-
-    print("=" * 75)
-    print("  ScamShield-AI Ablation Study: Component Impact Analysis")
-    print("=" * 75)
 
     summary_rows = []
 
@@ -148,7 +154,7 @@ def evaluate_ablation():
             "avg_latency": avg_lat
         })
 
-        print(f"  {name:<42} | Acc: {acc:>5}% | F1: {f1:>5}% | Prec: {prec:>5}%")
+        print(f"  {name:<42} | Acc: {acc:>5}% | F1: {f1:>5}% | Prec: {prec:>5}% ({avg_lat}s)")
 
     print("=" * 75)
     print("\n### Formatted Markdown Table for Your Research Paper / Report:\n")

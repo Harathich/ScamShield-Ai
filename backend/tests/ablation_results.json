@@ -1,0 +1,42 @@
+[
+  {
+    "configuration": "Full Multi-Agent System (All Agents)",
+    "accuracy": 50.0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1_score": 0.0,
+    "avg_latency": 0.0
+  },
+  {
+    "configuration": "Without Domain Agent (No WHOIS/VT)",
+    "accuracy": 50.0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1_score": 0.0,
+    "avg_latency": 0.0
+  },
+  {
+    "configuration": "Without Language Agent (No Urgency NLP)",
+    "accuracy": 50.0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1_score": 0.0,
+    "avg_latency": 0.0
+  },
+  {
+    "configuration": "Without Identity Agent (No Brand Spoof)",
+    "accuracy": 50.0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1_score": 0.0,
+    "avg_latency": 0.0
+  },
+  {
+    "configuration": "Without Critical Override (Pure Average)",
+    "accuracy": 50.0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1_score": 0.0,
+    "avg_latency": 0.0
+  }
+]
