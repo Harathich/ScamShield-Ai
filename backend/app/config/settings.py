@@ -1,7 +1,10 @@
 from dotenv import load_dotenv
 import os
+from pathlib import Path
 
-load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+env_path = BASE_DIR / ".env"
+load_dotenv(dotenv_path=env_path)
 
 # Support single key or comma-separated list of keys for automatic rate-limit rotation
 _single_key = os.getenv("GROQ_API_KEY", "")

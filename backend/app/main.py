@@ -30,13 +30,11 @@ app.include_router(analyze_recruitment_router)
 app.include_router(ocr_router)
 app.include_router(orchestrator_router)
 
-
 @app.get("/")
 def root():
     return {
         "message": "ScamShield AI Backend Running"
     }
-
 
 @app.get("/health")
 def health():

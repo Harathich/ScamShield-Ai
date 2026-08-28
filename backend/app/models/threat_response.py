@@ -9,4 +9,3 @@ class ThreatResponse(BaseModel):
     red_flags: list[str]
     reason: str
     recommendations: list[str]
-    

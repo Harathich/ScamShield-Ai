@@ -74,7 +74,7 @@ def threat_node(state: ScamShieldState) -> dict:
     """Run the Threat Agent on the clean normalized text."""
     norm = state.get("normalized_content", {})
     text = norm.get("clean_text") or state.get("input_text", "")
-    
+
     # Fast path for very short empty text
     if not text.strip():
         return {"threat_result": {

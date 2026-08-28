@@ -51,7 +51,7 @@ class FullAnalysisRequest(BaseModel):
             # 2. If not found in common keys, search all string values and pick the longest
             if not text:
                 string_vals = [
-                    v for k, v in values.items() 
+                    v for k, v in values.items()
                     if isinstance(v, str) and k.lower() not in ("url", "error", "language", "status", "type")
                 ]
                 if string_vals:
