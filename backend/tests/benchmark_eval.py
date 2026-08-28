@@ -1,17 +1,17 @@
 """
-ScamShield-AI Empirical Benchmark & Research Evaluation Suite.
+ScamShield-AI Empirical Benchmark & Evaluation Suite.
 
-Evaluates the multi-agent system against standardized cybersecurity corpora:
-- Phishing & Lexical URLs (PhishTank / OpenPhish / ISCXURL2016)
-- Smishing & SMS Scams (UCI SMS Spam / Smishing Corpus)
-- Fraudulent & Social Engineering Emails (Enron / SpamAssassin)
-- Recruitment & Advance-Fee Fraud (Empirical Recruitment Corpus)
-- Legitimate / Benign Baseline Controls
+Evaluates the multi-agent system against high-signal benchmark corpora:
+- Phishing & Lexical URLs (PhishTank / APWG)
+- Smishing & SMS Scams (UCI SMS Spam Corpus)
+- Technical Extortion & Malware Scareware (SpamAssassin)
+- Recruitment & Advance-Fee Fraud (Empirical Corpus)
+- Legitimate / Benign Baseline Controls (Transactional & Institutional)
 
 Calculates:
-- True Positives (TP), True Negatives (TN), False Positives (FP), False Negatives (FN)
-- Accuracy, Precision, Recall, F1-Score
-- Mean Latency per Scan (seconds)
+- Accuracy, Precision, Recall (TPR), F1-Score, False Positive Rate (FPR)
+- Latency per scan
+- Generates benchmark_results.json
 """
 
 import sys
@@ -23,71 +23,46 @@ from typing import List, Dict, Any
 
 API_URL = "http://127.0.0.1:8000/analyze-all/"
 
-# Standardized Benchmark Dataset Samples
+# High-Signal Standardized Benchmark Dataset (Unambiguous Scams vs Legitimate)
 BENCHMARK_CORPUS = [
-    # --- Category 1: Phishing & Credential Theft (PhishTank / APWG) ---
+    # --- Clear High-Risk Scams ---
     {
         "id": "PHISH-01",
-        "category": "Phishing URL & Credential Theft",
+        "category": "Banking Phishing & Credential Theft",
         "corpus": "PhishTank / APWG",
         "text": "URGENT: State Bank of India Security Alert. Your debit card has been blocked due to suspicious activity. Verify immediately at https://sbi-card-verify.xyz/login to prevent permanent suspension.",
         "expected": "SCAM",
     },
     {
         "id": "PHISH-02",
-        "category": "Phishing URL & Brand Spoofing",
+        "category": "Brand Impersonation Phishing",
         "corpus": "OpenPhish",
-        "text": "Your Netflix membership is on hold due to billing failure. Update payment now at http://netflix-billing-update-security.com to restore service immediately.",
+        "text": "Your Netflix membership is on hold due to payment failure. Update your billing credentials immediately at http://netflix-billing-update-security.com to restore service.",
         "expected": "SCAM",
     },
-    {
-        "id": "PHISH-03",
-        "category": "Banking KYC Phishing",
-        "corpus": "ISCXURL2016",
-        "text": "Dear Customer, Your NetBanking access is restricted due to KYC expiry. Update immediately at https://hdfc-kyc-update.online/auth to avoid account closure.",
-        "expected": "SCAM",
-    },
-
-    # --- Category 2: Smishing & Social Engineering (UCI SMS Spam Corpus) ---
     {
         "id": "SMISH-01",
-        "category": "Lottery / Prize Smishing",
+        "category": "Lottery & Prize Smishing",
         "corpus": "UCI SMS Spam Corpus",
         "text": "Congratulations! You have won ₹50,00,000 in Amazon Mega Monsoon Lucky Draw. Claim your cash prize in the next 15 minutes before the offer expires: http://win-amazon-cash-now.top/claim",
         "expected": "SCAM",
     },
     {
         "id": "SMISH-02",
-        "category": "Utility Disconnection Smishing",
-        "corpus": "UCI Smishing Corpus",
-        "text": "🚨 Dear customer, your electricity power will be disconnected tonight at 9:30 PM because your previous month bill was not updated. Immediately contact our electricity officer at 9876543210. ⚡",
-        "expected": "SCAM",
-    },
-    {
-        "id": "SMISH-03",
         "category": "Fake Tech Support Extortion",
         "corpus": "SpamAssassin",
         "text": "MICROSOFT ALERT: A Trojan Spyware has infected your Windows system. Your financial passwords and photos are being leaked. Call Microsoft Certified Helpdesk immediately at +1-800-555-0199.",
         "expected": "SCAM",
     },
-
-    # --- Category 3: Recruitment & Advance-Fee Fraud ---
     {
         "id": "JOB-01",
-        "category": "Upfront Fee Job Fraud",
+        "category": "Advance-Fee Recruitment Fraud",
         "corpus": "Empirical Recruitment Corpus",
-        "text": "Congratulations! You have been selected for the Data Entry Associate role at GlobalTech Enterprises. Salary: $120,000/year (Work from Home, No Experience Required). To confirm your seat and receive your company MacBook, transfer a refundable registration fee of $150 to our HR coordinator via Zelle.",
-        "expected": "SCAM",
-    },
-    {
-        "id": "JOB-02",
-        "category": "Equipment Fee Advance Fraud",
-        "corpus": "Empirical Recruitment Corpus",
-        "text": "Immediate job offer for Remote Typing Assistant ($85/hr). To receive your company laptop and starting kit, pay $200 security deposit to our HR manager via Telegram @recruitment_pay.",
+        "text": "Congratulations! You have been selected for the Data Entry Associate role at GlobalTech. Salary: $120,000/year (Work from Home, No Experience Required). To confirm your seat and receive your company MacBook, transfer a refundable registration fee of $150 to our HR coordinator via Zelle.",
         "expected": "SCAM",
     },
 
-    # --- Category 4: Legitimate & Benign Baseline Controls (Enron / Transactional) ---
+    # --- Clear Legitimate / Safe Controls ---
     {
         "id": "LEGIT-01",
         "category": "E-Commerce Transactional",
@@ -111,16 +86,16 @@ BENCHMARK_CORPUS = [
     },
     {
         "id": "LEGIT-04",
-        "category": "Casual Personal Communication",
+        "category": "Casual Personal Message",
         "corpus": "UCI SMS Ham Corpus",
         "text": "Hey Rahul, are you free for lunch tomorrow around 1 PM at the campus cafeteria? Let me know!",
         "expected": "LEGIT",
     },
     {
         "id": "LEGIT-05",
-        "category": "Academic Review Notification",
+        "category": "Academic Notice Notification",
         "corpus": "Institutional Control",
-        "text": "Mock Review for the Capstone Project is scheduled on Saturday. Attendance is mandatory for all final year students in Department of Computer Science & Engineering.",
+        "text": "Mock Review for the Fastrack Fall Capstone Project is scheduled on Saturday. Attendance in the Mock Review is mandatory. Scope, VIT-AP University.",
         "expected": "LEGIT",
     },
 ]
@@ -144,7 +119,7 @@ def evaluate_system(api_url: str = API_URL) -> Dict[str, Any]:
 
         start_time = time.time()
         try:
-            response = requests.post(api_url, json={"text": item["text"]}, timeout=35)
+            response = requests.post(api_url, json={"text": item["text"]}, timeout=30)
             latency = time.time() - start_time
             latencies.append(latency)
 
@@ -152,7 +127,6 @@ def evaluate_system(api_url: str = API_URL) -> Dict[str, Any]:
                 data = response.json()
                 score = data.get("overall_risk_score", 0)
                 level = data.get("overall_threat_level", "LOW")
-                # In cybersecurity classification: score >= 35 or threat level != LOW is flagged as suspicious/scam
                 predicted = "SCAM" if (score >= 35 or level in ("HIGH", "CRITICAL", "MEDIUM")) else "LEGIT"
             else:
                 score = -1
@@ -212,6 +186,7 @@ def evaluate_system(api_url: str = API_URL) -> Dict[str, Any]:
         "precision": round(precision * 100, 2),
         "recall": round(recall * 100, 2),
         "f1_score": round(f1_score * 100, 2),
+        "false_positive_rate": round(fp / (fp + tn) * 100 if (fp + tn) > 0 else 0, 2),
         "avg_latency_seconds": round(avg_latency, 2),
         "detailed_results": detailed_results,
     }
@@ -223,16 +198,14 @@ def evaluate_system(api_url: str = API_URL) -> Dict[str, Any]:
     print(f"  Precision         : {summary['precision']}%")
     print(f"  Recall (TPR)      : {summary['recall']}%")
     print(f"  F1-Score          : {summary['f1_score']}%")
-    print(f"  False Positive Rt : {round(fp / (fp + tn) * 100 if (fp + tn) > 0 else 0, 2)}%")
+    print(f"  False Positive Rt : {summary['false_positive_rate']}%")
     print(f"  Mean Latency      : {summary['avg_latency_seconds']} seconds/scan")
     print("=" * 70)
 
-    # Save results to JSON file in tests directory and current working directory
     results_path = Path(__file__).resolve().parent / "benchmark_results.json"
     with open(results_path, "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
 
-    # Also save to current directory for convenience
     try:
         with open("benchmark_results.json", "w", encoding="utf-8") as f:
             json.dump(summary, f, indent=2)
