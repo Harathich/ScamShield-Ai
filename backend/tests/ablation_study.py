@@ -17,6 +17,11 @@ import time
 from pathlib import Path
 from typing import Dict, Any, List
 
+# Ensure backend directory is in sys.path regardless of where the script is executed
+backend_dir = Path(__file__).resolve().parent.parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
 from app.graph.state import ScamShieldState
 from app.graph.nodes import (
     preprocess_node, threat_node, language_node,
@@ -152,10 +157,16 @@ def evaluate_ablation():
     for r in summary_rows:
         print(f"| **{r['configuration']}** | {r['accuracy']}% | {r['precision']}% | {r['recall']}% | {r['f1_score']}% | {r['avg_latency']}s |")
 
-    # Save to JSON
+    # Save to JSON in tests directory and working directory
     out_path = Path(__file__).resolve().parent / "ablation_results.json"
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(summary_rows, f, indent=2)
+
+    try:
+        with open("ablation_results.json", "w", encoding="utf-8") as f:
+            json.dump(summary_rows, f, indent=2)
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":
