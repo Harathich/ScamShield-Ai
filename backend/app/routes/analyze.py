@@ -12,8 +12,11 @@ router = APIRouter(
 threat_agent = ThreatAgent()
 
 
-@router.post("/",response_model=ThreatResponse)
+@router.post("/", response_model=ThreatResponse)
+@router.post("/analyze", response_model=ThreatResponse)
 def analyze(request: AnalyzeRequest):
+    if not request.text or not request.text.strip():
+        raise HTTPException(status_code=422, detail="Provide non-empty text to analyze.")
     try:
         result = threat_agent.analyze(request.text)
         return result

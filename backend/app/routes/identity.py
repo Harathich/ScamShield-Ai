@@ -13,7 +13,10 @@ identity_agent = IdentityAgent()
 
 
 @router.post("/", response_model=IdentityResponse)
+@router.post("/analyze", response_model=IdentityResponse)
 def analyze(request: AnalyzeRequest):
+    if not request.text or not request.text.strip():
+        raise HTTPException(status_code=422, detail="Provide non-empty text to analyze.")
     try:
         result = identity_agent.analyze(request.text)
         return result

@@ -54,24 +54,27 @@ export async function analyzeContent({ text = '', url = '', agent = 'all', file 
       });
     }
 
-    // Direct targeted agent endpoints or orchestrator
+    // Direct targeted agent endpoints
     if (agent !== 'all') {
       try {
         let endpoint = `${API_BASE_URL}/analyze-all/`;
         let body = { text, url: url || undefined };
 
-        if (agent === 'domain' && url) {
-          endpoint = `${API_BASE_URL}/analyze_domain/`;
-          body = { url };
+        if (agent === 'domain') {
+          endpoint = `${API_BASE_URL}/analyze-domain/`;
+          body = { url: url || text || undefined, text: text || undefined };
         } else if (agent === 'recruitment') {
-          endpoint = `${API_BASE_URL}/analyze_recruitment/`;
-          body = { text };
+          endpoint = `${API_BASE_URL}/recruitment/analyze`;
+          body = { text: text || url };
         } else if (agent === 'language') {
-          endpoint = `${API_BASE_URL}/language/`;
-          body = { text };
+          endpoint = `${API_BASE_URL}/language/analyze`;
+          body = { text: text || url };
         } else if (agent === 'identity') {
           endpoint = `${API_BASE_URL}/identity/`;
-          body = { text, sender: 'Unknown' };
+          body = { text: text || url };
+        } else if (agent === 'threat') {
+          endpoint = `${API_BASE_URL}/analyze/`;
+          body = { text: text || url };
         }
 
         const response = await fetch(endpoint, {
@@ -94,7 +97,7 @@ export async function analyzeContent({ text = '', url = '', agent = 'all', file 
       const response = await fetch(`${API_BASE_URL}/analyze-all/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, url: url || undefined }),
+        body: JSON.stringify({ text: text || undefined, url: url || undefined }),
       });
 
       if (response.ok) {
@@ -114,8 +117,145 @@ export async function analyzeContent({ text = '', url = '', agent = 'all', file 
 }
 
 function formatBackendResponse(data, queryContext) {
-  const riskScore = data.overall_risk_score ?? (data.risk_score ? data.risk_score * 100 : 75);
-  const threatLevel = data.overall_threat_level || (riskScore > 75 ? 'CRITICAL' : riskScore > 50 ? 'HIGH' : riskScore > 25 ? 'MODERATE' : 'LOW');
+  // Check if response is from an individual agent vs orchestrator
+  const isFullOrchestrator = data.overall_risk_score !== undefined || data.report !== undefined;
+  
+  let riskScore = 0;
+  let threatLevel = 'LOW';
+  let contributingFactors = [];
+  let agentSummary = {};
+  let detailedResults = {};
+  let report = null;
+
+  if (isFullOrchestrator) {
+    riskScore = data.overall_risk_score ?? (data.risk_score ? data.risk_score * 100 : 75);
+    threatLevel = data.overall_threat_level || (riskScore > 75 ? 'CRITICAL' : riskScore > 50 ? 'HIGH' : riskScore > 25 ? 'MODERATE' : 'LOW');
+    contributingFactors = data.contributing_factors || [];
+    
+    // Format agent summary from orchestrator
+    if (typeof data.agent_summary === 'object' && data.agent_summary !== null) {
+      agentSummary = {
+        threat_agent: typeof data.agent_summary.threat === 'object' 
+          ? `Score: ${data.agent_summary.threat.risk_score ?? 'N/A'}% (${data.agent_summary.threat.threat_level || 'Evaluated'})` 
+          : (data.agent_summary.threat || 'Threat evaluation completed'),
+        domain_agent: typeof data.agent_summary.domain === 'object' 
+          ? `Score: ${data.agent_summary.domain.risk_score ?? 'N/A'}% (${data.agent_summary.domain.threat_level || 'Evaluated'})` 
+          : (data.agent_summary.domain || 'Domain reputation check completed'),
+        identity_agent: typeof data.agent_summary.identity === 'object' 
+          ? `Score: ${data.agent_summary.identity.risk_score ?? 'N/A'}% (${data.agent_summary.identity.threat_level || 'Evaluated'})` 
+          : (data.agent_summary.identity || 'Brand impersonation check completed'),
+        language_agent: typeof data.agent_summary.language === 'object' 
+          ? `Score: ${data.agent_summary.language.risk_score ?? 'N/A'}% (${data.agent_summary.language.threat_level || 'Evaluated'})` 
+          : (data.agent_summary.language || 'Tone and urgency analysis completed'),
+        recruitment_agent: typeof data.agent_summary.recruitment === 'object' 
+          ? `Score: ${data.agent_summary.recruitment.risk_score ?? 'N/A'}% (${data.agent_summary.recruitment.threat_level || 'Evaluated'})` 
+          : (data.agent_summary.recruitment || 'Employment signals verified')
+      };
+    }
+
+    detailedResults = {
+      threat: data.threat_result,
+      domain: data.domain_result,
+      identity: data.identity_result,
+      language: data.language_result,
+      recruitment: data.recruitment_result
+    };
+
+    report = data.report || generateDefaultRecommendations(threatLevel, queryContext);
+
+  } else {
+    // Individual Agent Response Normalization
+    riskScore = data.risk_score !== undefined ? data.risk_score : 50;
+    threatLevel = data.threat_level || data.risk_level || (riskScore > 75 ? 'CRITICAL' : riskScore > 50 ? 'HIGH' : riskScore > 25 ? 'MODERATE' : 'LOW');
+
+    // 1. Domain Agent Response
+    if (data.agent === 'domain' || data.domain !== undefined) {
+      contributingFactors = [
+        ...(data.technical_red_flags || []),
+        data.explanation || (data.brand_impersonation ? 'Brand impersonation risk detected on domain' : '')
+      ].filter(Boolean);
+
+      agentSummary.domain_agent = `Domain ${data.domain || ''}: Age: ${data.domain_age || 'Unknown'}, SSL: ${data.ssl_status || 'Unknown'}. ${data.explanation || ''}`;
+      detailedResults.domain = data;
+      
+      report = {
+        summary: data.explanation || 'Domain analysis completed.',
+        immediate_actions: [data.recommendation || 'Do not submit credentials or payment details on unverified domains.'],
+        verification_steps: ['Check domain registration on official WHOIS directories.', 'Verify SSL lock and company registry.'],
+        reporting_channels: generateDefaultRecommendations(threatLevel, queryContext).reporting_channels
+      };
+    }
+    // 2. Language Agent Response
+    else if (data.agent === 'language' || data.manipulation_techniques !== undefined) {
+      contributingFactors = [
+        ...(data.manipulation_techniques || []),
+        data.summary || data.reason
+      ].filter(Boolean);
+
+      agentSummary.language_agent = `${data.summary || ''} ${data.reason || ''}`;
+      detailedResults.language = data;
+      
+      report = {
+        summary: data.summary || data.reason || 'Language analysis completed.',
+        immediate_actions: data.recommendations?.length ? data.recommendations : ['Do not react to artificial urgency or pressure.'],
+        verification_steps: ['Pause and consult an independent family member or trusted advisor before taking financial actions.'],
+        reporting_channels: generateDefaultRecommendations(threatLevel, queryContext).reporting_channels
+      };
+    }
+    // 3. Identity Agent Response
+    else if (data.agent === 'identity' || data.verification_status !== undefined) {
+      contributingFactors = [
+        ...(data.identity_red_flags || []),
+        ...(data.mismatch_findings || []),
+        data.reason
+      ].filter(Boolean);
+
+      agentSummary.identity_agent = `Status: ${data.verification_status || 'Evaluated'}. ${data.reason || ''}`;
+      detailedResults.identity = data;
+
+      report = {
+        summary: data.reason || 'Identity verification completed.',
+        immediate_actions: data.recommendations?.length ? data.recommendations : ['Do not share OTPs, PINs, or credentials with unverified senders.'],
+        verification_steps: ['Contact the claimed organization through their publicly listed directory.'],
+        reporting_channels: generateDefaultRecommendations(threatLevel, queryContext).reporting_channels
+      };
+    }
+    // 4. Recruitment Agent Response
+    else if (data.recruitment_red_flags !== undefined || data.job_information !== undefined) {
+      contributingFactors = [
+        ...(data.recruitment_red_flags || []),
+        ...(data.consistency_findings || []),
+        data.reason
+      ].filter(Boolean);
+
+      agentSummary.recruitment_agent = data.reason || 'Employment offer evaluated for fraudulent deposit models.';
+      detailedResults.recruitment = data;
+
+      report = {
+        summary: data.reason || 'Recruitment evaluation completed.',
+        immediate_actions: data.recommendations?.length ? data.recommendations : ['Never pay an upfront training, registration, or task deposit fee.'],
+        verification_steps: ['Look up the recruiter profile on official LinkedIn and official company job portals.'],
+        reporting_channels: generateDefaultRecommendations(threatLevel, queryContext).reporting_channels
+      };
+    }
+    // 5. Threat Agent Response
+    else {
+      contributingFactors = [
+        ...(data.red_flags || []),
+        data.reason
+      ].filter(Boolean);
+
+      agentSummary.threat_agent = data.reason || 'Threat signature check completed.';
+      detailedResults.threat = data;
+
+      report = {
+        summary: data.reason || 'Threat analysis completed.',
+        immediate_actions: data.recommendations?.length ? data.recommendations : ['Avoid engaging with the message.'],
+        verification_steps: ['Validate the legitimacy of the request.'],
+        reporting_channels: generateDefaultRecommendations(threatLevel, queryContext).reporting_channels
+      };
+    }
+  }
 
   return {
     id: 'scan_' + Date.now(),
@@ -126,30 +266,16 @@ function formatBackendResponse(data, queryContext) {
     confidence: data.confidence || 0.92,
     normalized_metadata: data.normalized_metadata || {
       detected_format: 'plain_text',
-      extracted_urls: queryContext.url ? [queryContext.url] : [],
-      extracted_emails: [],
-      extracted_phones: []
+      extracted_urls: queryContext.url ? [queryContext.url] : extractUrls(queryContext.text || ''),
+      extracted_emails: extractEmails(queryContext.text || ''),
+      extracted_phones: extractPhones(queryContext.text || '')
     },
-    contributing_factors: data.contributing_factors || [
-      'High urgency psychological manipulation detected',
-      'Unverified communication channel impersonating legitimate brand',
-      'Suspicious redirection link pattern'
+    contributing_factors: contributingFactors.length > 0 ? contributingFactors : [
+      'Automated analysis completed across specialized cyber intelligence models'
     ],
-    agent_summary: data.agent_summary || {
-      threat_agent: data.threat_result ? 'Identified malicious intent pattern' : 'Threat pattern evaluation completed',
-      domain_agent: data.domain_result ? 'Domain risk evaluated' : 'Domain lookup processed',
-      identity_agent: data.identity_result ? 'Brand spoofing detected' : 'Identity check performed',
-      language_agent: data.language_result ? 'Urgency and fear tactics detected' : 'Sentiment and pressure evaluated',
-      recruitment_agent: data.recruitment_result ? 'Work-from-home scam signals found' : 'Recruitment signals clean'
-    },
-    detailed_results: {
-      threat: data.threat_result,
-      domain: data.domain_result,
-      identity: data.identity_result,
-      language: data.language_result,
-      recruitment: data.recruitment_result
-    },
-    report: data.report || generateDefaultRecommendations(threatLevel, queryContext),
+    agent_summary: agentSummary,
+    detailed_results: detailedResults,
+    report: report || generateDefaultRecommendations(threatLevel, queryContext),
     isFallback: false
   };
 }

@@ -11,8 +11,11 @@ router = APIRouter(
 recruitment_agent = RecruitmentAgent()
 
 
+@router.post("/", response_model=RecruitmentResponse)
 @router.post("/analyze", response_model=RecruitmentResponse)
 def analyze(request: RecruitmentRequest):
+    if not request.text or not request.text.strip():
+        raise HTTPException(status_code=422, detail="Provide non-empty recruitment text to analyze.")
     try:
         result = recruitment_agent.analyze(request.text)
         return result

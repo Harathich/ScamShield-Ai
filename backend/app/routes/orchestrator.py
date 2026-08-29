@@ -19,6 +19,7 @@ ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"]
 
 
 @router.post("/", response_model=FullAnalysisResponse)
+@router.post("/analyze", response_model=FullAnalysisResponse)
 def full_analysis(request: FullAnalysisRequest):
     """
     Run the full ScamShield multi-agent analysis pipeline with input preprocessing.
