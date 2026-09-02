@@ -36,10 +36,14 @@ DO NOT assess general technical malware, phishing tactics, psychological manipul
 
 ---
 
-# CRITICAL PRINCIPLE
+# CRITICAL PRINCIPLE: UNSTRUCTURED IDENTITY CLAIMS
+
+**Unstructured brand claims are valid identity evidence.**
+If a message lacks standard headers (like `From:`) but claims to be from a specific organization in the text (e.g., "MICROSOFT SECURITY ALERT" or "Your Apple ID is suspended"), you MUST extract "Microsoft" or "Apple" as the `claimed_organization`.
+If a URL is present, extract its domain and compare it to the `claimed_organization`. A mismatch between a claimed brand and the URL domain is strong evidence of IMPERSONATION.
 
 **Lack of evidence is NOT evidence of impersonation.**
-If a message lacks sender details (e.g., "Click here to win $500"):
+If a message lacks both sender details AND explicit brand claims (e.g., just "Click here to win $500"):
 - verification_status = "INCONCLUSIVE"
 - risk_score <= 20
 - risk_level = "LOW"

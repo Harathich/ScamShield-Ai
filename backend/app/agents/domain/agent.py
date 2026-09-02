@@ -14,10 +14,22 @@ class DomainAgent:
     def analyze(self, url: str) -> dict:
         # 1. Perform technical analysis
         technical_evidence = self.analyzer.analyze(url)
-        
+
+        # 1b. If SSRF protection blocked this URL, return deterministic result (no LLM call)
+        if technical_evidence.get('ssrf_blocked'):
+            return {
+                "risk_score": 0,
+                "threat_level": "LOW",
+                "domain": technical_evidence.get('domain', url),
+                "reason": technical_evidence.get('error', 'SSRF blocked: private/internal address.'),
+                "ssrf_blocked": True,
+                "red_flags": ["Target resolves to a private or internal network address"],
+                "recommendations": ["Do not access internal/private network URLs from this tool."]
+            }
+
         # 2. Convert evidence to JSON string for the LLM prompt
         user_prompt = json.dumps(technical_evidence, indent=2)
-        
+
         # 3. Generate response from LLM
         response = self.llm.generate_content(
             system_prompt=self.system_prompt,

@@ -125,6 +125,14 @@ def language_node(state: ScamShieldState) -> dict:
         return {"language_result": {"agent": "language", "error": str(e)}}
 
 
+IDENTITY_KEYWORDS = {
+    "microsoft", "apple", "google", "netflix", "paypal", "sbi", "amazon", "github",
+    "facebook", "instagram", "twitter", "whatsapp", "linkedin", "hdfc", "icici",
+    "axis", "pnb", "stripe", "zoom", "slack", "fedex", "ups", "usps", "dhl",
+    "bank", "account", "security", "billing", "verify", "suspended", "compromised",
+    "support", "admin", "administrator"
+}
+
 def identity_node(state: ScamShieldState) -> dict:
     """
     Run Identity Agent. Fast-paths inconclusive status when no sender indicators exist.
@@ -133,9 +141,15 @@ def identity_node(state: ScamShieldState) -> dict:
     text = norm.get("clean_text") or state.get("input_text", "")
     emails = norm.get("extracted_emails", [])
     phones = norm.get("extracted_phones", [])
+    urls = norm.get("extracted_urls", [])
 
     has_header = bool(re.search(r'^(?:From:|Reply-To:|Sender:)', text, re.IGNORECASE | re.MULTILINE))
-    if not emails and not phones and not has_header and len(text.split()) < 25:
+
+    words = set(re.findall(r'\b\w+\b', text.lower()))
+    has_identity_keywords = bool(words.intersection(IDENTITY_KEYWORDS))
+    has_unstructured_brand_mention = bool(urls and has_identity_keywords)
+
+    if not emails and not phones and not has_header and not has_unstructured_brand_mention and len(words) < 25:
         return {"identity_result": {
             "agent": "identity",
             "risk_score": None,

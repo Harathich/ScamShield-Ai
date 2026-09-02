@@ -44,6 +44,12 @@ class DomainAnalyzer:
             result['error'] = "Invalid URL structure."
             return result
 
+        # --- SSRF Protection Gate (must run BEFORE any network I/O) ---
+        if not self._is_url_safe(url):
+            result['error'] = 'HTTP access blocked: target resolves to a private or internal address.'
+            result['ssrf_blocked'] = True
+            return result
+
         parsed_url = urlparse(url)
         domain_name = parsed_url.netloc
 
@@ -178,12 +184,84 @@ class DomainAnalyzer:
                 return True
         return False
 
-    def _is_safe_ip(self, hostname: str) -> bool:
+    # Known private/internal hostnames that should always be blocked
+    PRIVATE_HOSTNAMES = {'localhost', 'localhost.localdomain', 'ip6-localhost', 'ip6-loopback'}
+
+    @staticmethod
+    def _is_ip_private_or_reserved(ip_str: str) -> bool:
+        """Check if an IP address string is private, loopback, link-local, reserved, or otherwise non-public."""
         try:
-            ip = socket.gethostbyname(hostname)
-            ip_obj = ipaddress.ip_address(ip)
-            if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_multicast or ip_obj.is_reserved or ip_obj.is_unspecified:
+            ip_obj = ipaddress.ip_address(ip_str)
+            # For IPv4-mapped IPv6 addresses (e.g. ::ffff:127.0.0.1), also check the embedded IPv4
+            if isinstance(ip_obj, ipaddress.IPv6Address) and ip_obj.ipv4_mapped:
+                ip_obj = ip_obj.ipv4_mapped
+            return (
+                ip_obj.is_private
+                or ip_obj.is_loopback
+                or ip_obj.is_link_local
+                or ip_obj.is_multicast
+                or ip_obj.is_reserved
+                or ip_obj.is_unspecified
+            )
+        except (ValueError, TypeError):
+            return False
+
+    def _is_url_safe(self, url: str) -> bool:
+        """
+        Comprehensive SSRF protection: validates that a URL does not target
+        private, loopback, link-local, or reserved IP addresses.
+
+        Checks performed:
+        1. Hostname string match against known private hostnames (localhost, etc.)
+        2. Literal IP address check (IPv4 and IPv6) against private/reserved ranges
+        3. DNS resolution check — resolves hostname via getaddrinfo (IPv4 + IPv6)
+           and rejects if ANY resolved address is private/reserved
+        """
+        try:
+            parsed = urlparse(url)
+            hostname = parsed.hostname
+            if not hostname:
                 return False
+
+            hostname_lower = hostname.lower().strip('.')
+
+            # 1. Reject known private hostnames
+            if hostname_lower in self.PRIVATE_HOSTNAMES:
+                return False
+
+            # 2. Check if hostname is a literal IP address
+            try:
+                if self._is_ip_private_or_reserved(hostname_lower):
+                    return False
+            except Exception:
+                pass
+
+            # 3. DNS resolution check — resolve ALL addresses (IPv4 + IPv6)
+            try:
+                addr_infos = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+                if not addr_infos:
+                    return False
+                for family, _type, _proto, _canonname, sockaddr in addr_infos:
+                    resolved_ip = sockaddr[0]
+                    if self._is_ip_private_or_reserved(resolved_ip):
+                        return False
+            except socket.gaierror:
+                # DNS resolution failed — domain doesn't exist, which is fine
+                # (the domain analysis will just flag it as suspicious)
+                pass
+
+            return True
+        except Exception:
+            return False
+
+    def _is_safe_ip(self, hostname: str) -> bool:
+        """Legacy compatibility wrapper. Used by _check_http_accessibility as defense-in-depth."""
+        try:
+            addr_infos = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+            for family, _type, _proto, _canonname, sockaddr in addr_infos:
+                resolved_ip = sockaddr[0]
+                if self._is_ip_private_or_reserved(resolved_ip):
+                    return False
             return True
         except Exception:
             return False

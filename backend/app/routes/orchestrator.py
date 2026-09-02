@@ -125,3 +125,58 @@ async def analyze_image_upload(file: UploadFile = File(...)):
 
     # Feed extracted OCR text through the full multi-agent pipeline
     return full_analysis(FullAnalysisRequest(text=extracted_text))
+
+import io
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
+
+ALLOWED_PDF_MIME_TYPES = ["application/pdf"]
+
+@router.post("/pdf", response_model=FullAnalysisResponse)
+async def analyze_pdf_upload(file: UploadFile = File(...)):
+    """
+    Run the full ScamShield multi-agent analysis pipeline on an uploaded PDF document.
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided.")
+
+    if file.content_type not in ALLOWED_PDF_MIME_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type: {file.content_type}. Only PDF is supported."
+        )
+
+    file_bytes = await file.read()
+    if len(file_bytes) == 0:
+        raise HTTPException(status_code=400, detail="Empty PDF file uploaded.")
+    if len(file_bytes) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail=f"File exceeds maximum size of {MAX_FILE_SIZE_MB}MB.")
+
+    kind = filetype.guess(file_bytes)
+    # filetype might not confidently guess PDF in all minimal cases, but if it guesses something else, reject.
+    if kind is not None and kind.mime not in ALLOWED_PDF_MIME_TYPES:
+        raise HTTPException(status_code=400, detail="File content does not match a PDF format.")
+
+    try:
+        reader = PdfReader(io.BytesIO(file_bytes))
+        extracted_text = ""
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                extracted_text += page_text + "\n"
+    except PdfReadError:
+        raise HTTPException(status_code=400, detail="Corrupted or invalid PDF file.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process PDF: {str(e)}")
+
+    if not extracted_text.strip():
+        # Fallback to OCR if it's a scanned PDF
+        ocr_result = ocr_service.extract_text(file_bytes)
+        if ocr_result.get("success"):
+            extracted_text = ocr_result.get("extracted_text", "")
+
+    if not extracted_text.strip():
+        raise HTTPException(status_code=400, detail="No readable text could be extracted from the uploaded PDF.")
+
+    # Feed extracted PDF text through the full multi-agent pipeline
+    return full_analysis(FullAnalysisRequest(text=extracted_text))

@@ -25,31 +25,35 @@ export async function checkBackendHealth() {
  */
 export async function analyzeContent({ text = '', url = '', agent = 'all', file = null }) {
   try {
-    // If a file was uploaded for OCR analysis
+    // If a file was uploaded for OCR or PDF analysis
     if (file) {
       const formData = new FormData();
       formData.append('file', file);
 
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      const endpoint = isPdf ? `${API_BASE_URL}/analyze-all/pdf` : `${API_BASE_URL}/analyze-all/image`;
+
       try {
-        const response = await fetch(`${API_BASE_URL}/analyze-all/image`, {
+        const response = await fetch(endpoint, {
           method: 'POST',
           body: formData,
         });
 
         if (response.ok) {
           const data = await response.json();
-          return formatBackendResponse(data, { text: `[Image OCR: ${file.name}]`, url: '', agent: 'ocr' });
+          return formatBackendResponse(data, { text: `[${isPdf ? 'PDF Document' : 'Image OCR'}: ${file.name}]`, url: '', agent: isPdf ? 'pdf' : 'ocr' });
         }
       } catch (err) {
-        console.warn('Backend image OCR request failed, using intelligent image simulation fallback', err);
+        console.warn(`Backend ${isPdf ? 'PDF' : 'image OCR'} request failed, using intelligent simulation fallback`, err);
       }
 
-      // Simulated Image OCR scan fallback
+      // Simulated Image/PDF scan fallback
       return generateSimulatedResponse({
         text: `Urgent notification from security team: Your account has been temporarily restricted. Click verify-login-update.online to restore access immediately.`,
         url: 'http://verify-login-update.online',
-        agent: 'ocr',
-        isImage: true,
+        agent: isPdf ? 'pdf' : 'ocr',
+        isImage: !isPdf,
+        isPdf: isPdf,
         filename: file.name
       });
     }
@@ -119,7 +123,7 @@ export async function analyzeContent({ text = '', url = '', agent = 'all', file 
 function formatBackendResponse(data, queryContext) {
   // Check if response is from an individual agent vs orchestrator
   const isFullOrchestrator = data.overall_risk_score !== undefined || data.report !== undefined;
-  
+
   let riskScore = 0;
   let threatLevel = 'LOW';
   let contributingFactors = [];
@@ -131,24 +135,24 @@ function formatBackendResponse(data, queryContext) {
     riskScore = data.overall_risk_score ?? (data.risk_score ? data.risk_score * 100 : 75);
     threatLevel = data.overall_threat_level || (riskScore > 75 ? 'CRITICAL' : riskScore > 50 ? 'HIGH' : riskScore > 25 ? 'MODERATE' : 'LOW');
     contributingFactors = data.contributing_factors || [];
-    
+
     // Format agent summary from orchestrator
     if (typeof data.agent_summary === 'object' && data.agent_summary !== null) {
       agentSummary = {
-        threat_agent: typeof data.agent_summary.threat === 'object' 
-          ? `Score: ${data.agent_summary.threat.risk_score ?? 'N/A'}% (${data.agent_summary.threat.threat_level || 'Evaluated'})` 
+        threat_agent: typeof data.agent_summary.threat === 'object'
+          ? `Score: ${data.agent_summary.threat.risk_score ?? 'N/A'}% (${data.agent_summary.threat.threat_level || 'Evaluated'})`
           : (data.agent_summary.threat || 'Threat evaluation completed'),
-        domain_agent: typeof data.agent_summary.domain === 'object' 
-          ? `Score: ${data.agent_summary.domain.risk_score ?? 'N/A'}% (${data.agent_summary.domain.threat_level || 'Evaluated'})` 
+        domain_agent: typeof data.agent_summary.domain === 'object'
+          ? `Score: ${data.agent_summary.domain.risk_score ?? 'N/A'}% (${data.agent_summary.domain.threat_level || 'Evaluated'})`
           : (data.agent_summary.domain || 'Domain reputation check completed'),
-        identity_agent: typeof data.agent_summary.identity === 'object' 
-          ? `Score: ${data.agent_summary.identity.risk_score ?? 'N/A'}% (${data.agent_summary.identity.threat_level || 'Evaluated'})` 
+        identity_agent: typeof data.agent_summary.identity === 'object'
+          ? `Score: ${data.agent_summary.identity.risk_score ?? 'N/A'}% (${data.agent_summary.identity.threat_level || 'Evaluated'})`
           : (data.agent_summary.identity || 'Brand impersonation check completed'),
-        language_agent: typeof data.agent_summary.language === 'object' 
-          ? `Score: ${data.agent_summary.language.risk_score ?? 'N/A'}% (${data.agent_summary.language.threat_level || 'Evaluated'})` 
+        language_agent: typeof data.agent_summary.language === 'object'
+          ? `Score: ${data.agent_summary.language.risk_score ?? 'N/A'}% (${data.agent_summary.language.threat_level || 'Evaluated'})`
           : (data.agent_summary.language || 'Tone and urgency analysis completed'),
-        recruitment_agent: typeof data.agent_summary.recruitment === 'object' 
-          ? `Score: ${data.agent_summary.recruitment.risk_score ?? 'N/A'}% (${data.agent_summary.recruitment.threat_level || 'Evaluated'})` 
+        recruitment_agent: typeof data.agent_summary.recruitment === 'object'
+          ? `Score: ${data.agent_summary.recruitment.risk_score ?? 'N/A'}% (${data.agent_summary.recruitment.threat_level || 'Evaluated'})`
           : (data.agent_summary.recruitment || 'Employment signals verified')
       };
     }
@@ -177,7 +181,7 @@ function formatBackendResponse(data, queryContext) {
 
       agentSummary.domain_agent = `Domain ${data.domain || ''}: Age: ${data.domain_age || 'Unknown'}, SSL: ${data.ssl_status || 'Unknown'}. ${data.explanation || ''}`;
       detailedResults.domain = data;
-      
+
       report = {
         summary: data.explanation || 'Domain analysis completed.',
         immediate_actions: [data.recommendation || 'Do not submit credentials or payment details on unverified domains.'],
@@ -194,7 +198,7 @@ function formatBackendResponse(data, queryContext) {
 
       agentSummary.language_agent = `${data.summary || ''} ${data.reason || ''}`;
       detailedResults.language = data;
-      
+
       report = {
         summary: data.summary || data.reason || 'Language analysis completed.',
         immediate_actions: data.recommendations?.length ? data.recommendations : ['Do not react to artificial urgency or pressure.'],
@@ -282,9 +286,9 @@ function formatBackendResponse(data, queryContext) {
 
 function generateDefaultRecommendations(threatLevel, context) {
   const isHigh = threatLevel === 'HIGH' || threatLevel === 'CRITICAL';
-  
+
   return {
-    summary: isHigh 
+    summary: isHigh
       ? 'This content exhibits prominent red flags commonly associated with phishing and financial fraud. Exercise extreme caution.'
       : 'This content appears relatively safe, but always verify sender credentials through official verified channels.',
     immediate_actions: isHigh ? [
@@ -314,7 +318,7 @@ function generateDefaultRecommendations(threatLevel, context) {
  */
 function generateSimulatedResponse({ text = '', url = '', agent = 'all', isImage = false, filename = '' }) {
   const combined = (text + ' ' + url).toLowerCase();
-  
+
   // Dynamic heuristic detection
   const isFinancial = combined.includes('bank') || combined.includes('account') || combined.includes('suspended') || combined.includes('otp') || combined.includes('kyc') || combined.includes('upi') || combined.includes('card');
   const isRecruitment = combined.includes('job') || combined.includes('task') || combined.includes('telegram') || combined.includes('earn') || combined.includes('salary') || combined.includes('daily') || combined.includes('part-time');
