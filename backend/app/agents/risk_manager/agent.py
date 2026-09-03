@@ -65,6 +65,8 @@ class RiskManager:
         confidences = []
         contributing_factors = []
         has_critical = False
+        has_high = False
+        has_medium = False
 
         for agent_name, weight in AGENT_WEIGHTS.items():
             result = agent_results.get(agent_name)
@@ -110,9 +112,13 @@ class RiskManager:
             total_weight += adjusted_weight
             confidences.append(confidence)
 
-            # Check for critical override
+            # Check for critical/high/medium override
             if level == "CRITICAL" or score >= 76:
                 has_critical = True
+            elif level == "HIGH" or score >= 51:
+                has_high = True
+            elif level == "MEDIUM" or score >= 26:
+                has_medium = True
 
             # Collect contributing factors from high-risk agents
             if score >= 51:
@@ -150,9 +156,13 @@ class RiskManager:
         else:
             overall_score = 0
 
-        # Critical override: if any agent flagged CRITICAL, bump overall to at least 76
+        # Overrides: bump the score if any agent flagged a specific minimum level
         if has_critical and overall_score < 76:
             overall_score = max(overall_score, 76)
+        elif has_high and overall_score < 51:
+            overall_score = max(overall_score, 51)
+        elif has_medium and overall_score < 26:
+            overall_score = max(overall_score, 26)
 
         # Clamp to 0-100
         overall_score = max(0, min(100, overall_score))

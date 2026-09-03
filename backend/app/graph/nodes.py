@@ -181,8 +181,13 @@ def domain_node(state: ScamShieldState) -> dict:
     norm = state.get("normalized_content", {})
     extracted_urls = norm.get("extracted_urls", [])
 
+    # Use normalized explicit URL if available
     url = state.get("input_url")
-    if not url and extracted_urls:
+    if url:
+        url = url.strip()
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+    elif extracted_urls:
         url = extracted_urls[0]
 
     if not url:

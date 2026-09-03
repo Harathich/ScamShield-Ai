@@ -6,7 +6,7 @@ import validators
 import requests
 from urllib.parse import urlparse
 import ipaddress
-from datetime import datetime
+from datetime import datetime, timezone
 import re
 
 from app.tools.security.virustotal_tool import VirusTotalTool
@@ -37,17 +37,17 @@ class DomainAnalyzer:
         if not url.startswith('http://') and not url.startswith('https://'):
             url = 'https://' + url
 
+        # --- SSRF Protection Gate (must run BEFORE any network I/O) ---
+        if not self._is_url_safe(url):
+            result['error'] = 'HTTP access blocked: target resolves to a private or internal address.'
+            result['ssrf_blocked'] = True
+            return result
+
         is_valid = (validators.url(url) is True)
         result['url_valid'] = is_valid
 
         if not is_valid:
             result['error'] = "Invalid URL structure."
-            return result
-
-        # --- SSRF Protection Gate (must run BEFORE any network I/O) ---
-        if not self._is_url_safe(url):
-            result['error'] = 'HTTP access blocked: target resolves to a private or internal address.'
-            result['ssrf_blocked'] = True
             return result
 
         parsed_url = urlparse(url)
@@ -120,10 +120,15 @@ class DomainAnalyzer:
         try:
             if isinstance(creation_date, str):
                 creation_date = datetime.fromisoformat(creation_date)
-            now = datetime.now()
+
+            # Make sure we're comparing apples to apples (naive vs aware)
+            now = datetime.now(timezone.utc) if creation_date.tzinfo else datetime.now()
+
             age_timedelta = now - creation_date
             days = age_timedelta.days
-            if days < 30:
+            if days < 0:
+                return f"Anomaly: Registered in the future ({days} days)"
+            elif days < 30:
                 return f"{days} days (Very Recent)"
             elif days < 365:
                 return f"{days // 30} months"
@@ -264,22 +269,31 @@ class DomainAnalyzer:
                     return False
             return True
         except Exception:
-            return False
+            # If domain doesn't resolve, it's not a private IP. Let requests.get handle the connection error.
+            return True
 
     def _check_http_accessibility(self, url: str) -> dict:
         parsed = urlparse(url)
         hostname = parsed.hostname
         if not hostname or not self._is_safe_ip(hostname):
-            return {'accessible': False, 'error': 'Security restriction.'}
+            return {'accessible': False, 'access_status': 'SSRF_BLOCKED', 'website_content_available': False, 'error': 'Security restriction.'}
 
         try:
             headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
             response = requests.get(url, headers=headers, timeout=2.0, allow_redirects=False)
             if response.status_code in [200, 301, 302, 307, 308]:
-                return {'accessible': True, 'status_code': response.status_code, 'note': 'Site is accessible.'}
-            elif response.status_code in [403, 401]:
-                return {'accessible': False, 'status_code': response.status_code, 'note': 'Access blocked.'}
+                return {'accessible': True, 'access_status': 'ACCESSIBLE', 'website_content_available': True, 'status_code': response.status_code, 'note': 'Site is accessible.'}
+            elif response.status_code in [403, 401, 406]:
+                return {'accessible': False, 'access_status': 'ACCESS_RESTRICTED', 'website_content_available': False, 'status_code': response.status_code, 'note': 'Access blocked.'}
+            elif response.status_code == 429:
+                return {'accessible': False, 'access_status': 'RATE_LIMITED', 'website_content_available': False, 'status_code': response.status_code, 'note': 'Rate limited.'}
             else:
-                return {'accessible': False, 'status_code': response.status_code, 'note': f'HTTP {response.status_code}'}
+                return {'accessible': False, 'access_status': 'HTTP_ERROR', 'website_content_available': False, 'status_code': response.status_code, 'note': f'HTTP {response.status_code}'}
+        except requests.exceptions.Timeout:
+            return {'accessible': False, 'access_status': 'TIMEOUT', 'website_content_available': False, 'error': 'Connection timed out.'}
+        except requests.exceptions.ConnectionError as e:
+            if 'getaddrinfo' in str(e).lower() or 'name resolution' in str(e).lower():
+                return {'accessible': False, 'access_status': 'DNS_FAILURE', 'website_content_available': False, 'error': 'DNS resolution failed.'}
+            return {'accessible': False, 'access_status': 'HOST_UNREACHABLE', 'website_content_available': False, 'error': 'Host unreachable.'}
         except Exception:
-            return {'accessible': False, 'error': 'Connection timed out or host down.'}
+            return {'accessible': False, 'access_status': 'UNKNOWN', 'website_content_available': False, 'error': 'Unknown error.'}

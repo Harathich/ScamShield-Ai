@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   ShieldCheck,
   Search,
@@ -84,6 +84,31 @@ export default function InputHero({
     setActiveTab(isPdf ? 'pdf' : 'image');
   };
 
+
+  const handlePaste = (e) => {
+    if (activeTab === 'image' || activeTab === 'pdf') {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf(activeTab === 'image' ? 'image' : 'pdf') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            handleFileChange(file);
+            e.preventDefault();
+            break;
+          }
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener('paste', handlePaste);
+    return () => {
+      window.removeEventListener('paste', handlePaste);
+    };
+  }, [activeTab]);
+
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -114,17 +139,16 @@ export default function InputHero({
 
     if (activeTab === 'url') {
       if (!inputUrl.trim()) return;
-      onAnalyze({ url: inputUrl.trim(), text: inputText.trim(), agent: selectedAgent });
+      onAnalyze({ url: inputUrl.trim(), text: '', agent: selectedAgent });
       return;
     }
 
-    if (!inputText.trim() && !inputUrl.trim()) return;
+    if (activeTab === 'job' || activeTab === 'text') {
+      if (!inputText.trim()) return;
+      onAnalyze({ text: inputText.trim(), url: '', agent: selectedAgent });
+      return;
+    }
 
-    onAnalyze({
-      text: inputText.trim(),
-      url: inputUrl.trim(),
-      agent: selectedAgent
-    });
   };
 
   const clearInput = () => {
@@ -238,7 +262,7 @@ export default function InputHero({
               <div className="relative flex items-center">
                 <Globe className="absolute left-4 w-5 h-5 text-slate-400" />
                 <input
-                  type="url"
+                  type="text"
                   value={inputUrl}
                   onChange={(e) => setInputUrl(e.target.value)}
                   placeholder="https://suspicious-website-example.com/login"
@@ -304,6 +328,8 @@ export default function InputHero({
               onDragLeave={handleDrag}
               onDragOver={handleDrag}
               onDrop={handleDrop}
+              onPaste={handlePaste}
+              tabIndex={0}
               onClick={() => !(previewUrl || (activeTab === 'pdf' && selectedFile)) && fileInputRef.current?.click()}
               className={`relative rounded-xl border-2 border-dashed p-6 text-center cursor-pointer transition-all ${
                 dragActive
@@ -363,7 +389,7 @@ export default function InputHero({
                     <Upload className="w-6 h-6" />
                   </div>
                   <div className="text-sm font-medium text-slate-200">
-                    {activeTab === 'pdf' ? "Drag & drop PDF document here" : "Drag & drop WhatsApp, SMS, or Email screenshot"}
+                    {activeTab === 'pdf' ? "Paste, or drag & drop PDF document here" : "Paste, or drag & drop WhatsApp, SMS, or Email screenshot"}
                   </div>
                   <p className="text-xs text-slate-500">
                     {activeTab === 'pdf' ? "Supports PDF (Up to 10MB)" : "Supports PNG, JPG, WEBP (Up to 10MB)"}

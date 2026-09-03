@@ -21,7 +21,7 @@ export default function RiskCard({ result }) {
   if (!result) return null;
 
   const score = result.overall_risk_score ?? 50;
-  const threatLevel = result.overall_threat_level || (score > 75 ? 'CRITICAL' : score > 50 ? 'HIGH' : score > 25 ? 'MODERATE' : 'LOW');
+  const threatLevel = result.overall_threat_level || (score >= 76 ? 'CRITICAL' : score >= 51 ? 'HIGH' : score >= 26 ? 'MEDIUM' : 'LOW');
 
   // Color mappings
   const getTheme = () => {
@@ -46,15 +46,15 @@ export default function RiskCard({ result }) {
           label: 'HIGH THREAT DETECTED',
           desc: 'Multiple malicious characteristics identified across AI agents.'
         };
-      case 'MODERATE':
+      case 'MEDIUM':
         return {
           bg: 'bg-amber-500/10',
           border: 'border-amber-500/40',
           text: 'text-amber-400',
           badge: 'bg-amber-500 text-white shadow-amber-500/30',
           meter: '#F59E0B',
-          label: 'SUSPICIOUS / CAUTION',
-          desc: 'Contains suspicious elements. Exercise caution and verify credentials.'
+          label: 'UNVERIFIED / MEDIUM RISK',
+          desc: 'Legitimacy could not be independently verified or suspicious elements exist.'
         };
       case 'LOW':
       default:
@@ -219,20 +219,86 @@ export default function RiskCard({ result }) {
             
             {/* Domain Agent */}
             <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs">
-              <div className="flex items-center gap-2 font-bold text-slate-200 mb-1">
-                <Globe className="w-3.5 h-3.5 text-blue-400" />
-                <span>Domain & URL Agent</span>
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2 font-bold text-slate-200">
+                  <Globe className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Domain & URL Agent</span>
+                </div>
+                {result.detailed_results?.domain && !result.detailed_results.domain.skipped && result.detailed_results.domain.risk_score != null && (
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    result.detailed_results.domain.risk_score >= 76 ? 'bg-red-500/20 text-red-400' :
+                    result.detailed_results.domain.risk_score >= 51 ? 'bg-orange-500/20 text-orange-400' :
+                    result.detailed_results.domain.risk_score >= 26 ? 'bg-amber-500/20 text-amber-400' :
+                    'bg-emerald-500/20 text-emerald-400'
+                  }`}>
+                    {result.detailed_results.domain.risk_score}% · {result.detailed_results.domain.risk_level || result.detailed_results.domain.threat_level || 'N/A'}
+                  </span>
+                )}
               </div>
               <p className="text-slate-400 text-[11px] leading-relaxed">
                 {result.agent_summary?.domain_agent || 'Evaluated DNS, registration tenure, SSL cert validity, and typo-squatting risks.'}
+              </p>
+              {result.detailed_results?.domain?.verification_status && (
+                <div className="mt-2 space-y-1">
+                  <div className="flex justify-between items-center bg-slate-800/50 px-2 py-1 rounded">
+                    <span className="text-[10px] uppercase text-slate-500 font-bold">Verification</span>
+                    <span className={`text-[10px] font-bold ${result.detailed_results.domain.verification_status === 'VERIFIED' ? 'text-emerald-400' : result.detailed_results.domain.verification_status === 'PARTIALLY_VERIFIED' ? 'text-blue-400' : 'text-amber-400'}`}>
+                      {result.detailed_results.domain.verification_status.replace('_', ' ')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center bg-slate-800/50 px-2 py-1 rounded">
+                    <span className="text-[10px] uppercase text-slate-500 font-bold">Website Access</span>
+                    <span className={`text-[10px] font-bold ${result.detailed_results.domain.access_status === 'ACCESSIBLE' ? 'text-emerald-400' : result.detailed_results.domain.access_status === 'ACCESS_RESTRICTED' ? 'text-amber-400' : 'text-red-400'}`}>
+                      {result.detailed_results.domain.access_status ? result.detailed_results.domain.access_status.replace('_', ' ') : 'UNKNOWN'}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Threat Agent */}
+            <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2 font-bold text-slate-200">
+                  <Fingerprint className="w-3.5 h-3.5 text-red-400" />
+                  <span>Threat Detection Agent</span>
+                </div>
+                {result.detailed_results?.threat && !result.detailed_results.threat.skipped && result.detailed_results.threat.risk_score != null && (
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    result.detailed_results.threat.risk_score >= 76 ? 'bg-red-500/20 text-red-400' :
+                    result.detailed_results.threat.risk_score >= 51 ? 'bg-orange-500/20 text-orange-400' :
+                    result.detailed_results.threat.risk_score >= 26 ? 'bg-amber-500/20 text-amber-400' :
+                    'bg-emerald-500/20 text-emerald-400'
+                  }`}>
+                    {result.detailed_results.threat.risk_score}% · {result.detailed_results.threat.threat_level || 'N/A'}
+                  </span>
+                )}
+              </div>
+              <p className="text-slate-400 text-[11px] leading-relaxed">
+                {result.agent_summary?.threat_agent || 'Threat signature check completed.'}
               </p>
             </div>
 
             {/* Identity Agent */}
             <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs">
-              <div className="flex items-center gap-2 font-bold text-slate-200 mb-1">
-                <UserCheck className="w-3.5 h-3.5 text-purple-400" />
-                <span>Identity & Brand Agent</span>
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2 font-bold text-slate-200">
+                  <UserCheck className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Identity & Brand Agent</span>
+                </div>
+                {result.detailed_results?.identity && !result.detailed_results.identity.skipped && result.detailed_results.identity.risk_score != null && (
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    result.detailed_results.identity.risk_score >= 76 ? 'bg-red-500/20 text-red-400' :
+                    result.detailed_results.identity.risk_score >= 51 ? 'bg-orange-500/20 text-orange-400' :
+                    result.detailed_results.identity.risk_score >= 26 ? 'bg-amber-500/20 text-amber-400' :
+                    'bg-emerald-500/20 text-emerald-400'
+                  }`}>
+                    {result.detailed_results.identity.risk_score}% · {result.detailed_results.identity.threat_level || result.detailed_results.identity.verification_status || 'N/A'}
+                  </span>
+                )}
+                {result.detailed_results?.identity?.skipped && (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-700/40 text-slate-500">Skipped</span>
+                )}
               </div>
               <p className="text-slate-400 text-[11px] leading-relaxed">
                 {result.agent_summary?.identity_agent || 'Checked for impersonation of banking authorities, courier services, or corporate brands.'}
@@ -241,9 +307,21 @@ export default function RiskCard({ result }) {
 
             {/* Language Agent */}
             <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs">
-              <div className="flex items-center gap-2 font-bold text-slate-200 mb-1">
-                <MessageSquareWarning className="w-3.5 h-3.5 text-red-400" />
-                <span>Language & Urgency Agent</span>
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2 font-bold text-slate-200">
+                  <MessageSquareWarning className="w-3.5 h-3.5 text-red-400" />
+                  <span>Language & Urgency Agent</span>
+                </div>
+                {result.detailed_results?.language && !result.detailed_results.language.skipped && result.detailed_results.language.risk_score != null && (
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    result.detailed_results.language.risk_score >= 76 ? 'bg-red-500/20 text-red-400' :
+                    result.detailed_results.language.risk_score >= 51 ? 'bg-orange-500/20 text-orange-400' :
+                    result.detailed_results.language.risk_score >= 26 ? 'bg-amber-500/20 text-amber-400' :
+                    'bg-emerald-500/20 text-emerald-400'
+                  }`}>
+                    {result.detailed_results.language.risk_score}% · {result.detailed_results.language.threat_level || 'N/A'}
+                  </span>
+                )}
               </div>
               <p className="text-slate-400 text-[11px] leading-relaxed">
                 {result.agent_summary?.language_agent || 'Scanned for psychological coercion, artificial deadlines (e.g. 24hr threat), and fear appeals.'}
@@ -252,9 +330,24 @@ export default function RiskCard({ result }) {
 
             {/* Recruitment Agent */}
             <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs">
-              <div className="flex items-center gap-2 font-bold text-slate-200 mb-1">
-                <Briefcase className="w-3.5 h-3.5 text-amber-400" />
-                <span>Recruitment & Job Scam Agent</span>
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2 font-bold text-slate-200">
+                  <Briefcase className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Recruitment & Job Scam Agent</span>
+                </div>
+                {result.detailed_results?.recruitment && !result.detailed_results.recruitment.skipped && result.detailed_results.recruitment.risk_score != null && (
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    result.detailed_results.recruitment.risk_score >= 76 ? 'bg-red-500/20 text-red-400' :
+                    result.detailed_results.recruitment.risk_score >= 51 ? 'bg-orange-500/20 text-orange-400' :
+                    result.detailed_results.recruitment.risk_score >= 26 ? 'bg-amber-500/20 text-amber-400' :
+                    'bg-emerald-500/20 text-emerald-400'
+                  }`}>
+                    {result.detailed_results.recruitment.risk_score}% · {result.detailed_results.recruitment.threat_level || result.detailed_results.recruitment.risk_level || 'N/A'}
+                  </span>
+                )}
+                {result.detailed_results?.recruitment?.skipped && (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-700/40 text-slate-500">Skipped</span>
+                )}
               </div>
               <p className="text-slate-400 text-[11px] leading-relaxed">
                 {result.agent_summary?.recruitment_agent || 'Analyzed task-based pay models, unauthorized Telegram recruiters, and deposit demands.'}

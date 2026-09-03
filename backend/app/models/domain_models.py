@@ -38,3 +38,10 @@ class DomainAnalyzeResponse(BaseModel):
     recommendation: str
     explanation: str
     reputation: Optional[Dict[str, Any]] = None
+    ssrf_blocked: bool = False
+    verification_status: Optional[str] = None
+    access_status: Optional[str] = None
+    website_content_available: Optional[bool] = None
+    legitimacy_indicators: Optional[List[str]] = None
+    malicious_indicators: Optional[List[str]] = None
+    evidence_limitations: Optional[List[str]] = None

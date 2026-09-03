@@ -267,7 +267,9 @@ function formatBackendResponse(data, queryContext) {
     queryContext,
     overall_risk_score: Math.round(riskScore),
     overall_threat_level: threatLevel,
-    confidence: data.confidence || 0.92,
+    confidence: data.confidence !== undefined && data.confidence !== null
+      ? (data.confidence > 1 ? data.confidence / 100 : data.confidence)
+      : 0.92,
     normalized_metadata: data.normalized_metadata || {
       detected_format: 'plain_text',
       extracted_urls: queryContext.url ? [queryContext.url] : extractUrls(queryContext.text || ''),

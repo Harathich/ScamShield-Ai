@@ -70,6 +70,7 @@ class ReportGenerator:
             "why_risky": why_risky,
             "agent_highlights": agent_highlights,
             "recommendations": recommendations,
+            "immediate_actions": recommendations,
             "safe_indicators": safe_indicators,
         }
 
@@ -182,6 +183,11 @@ class ReportGenerator:
             for r in ag.get("recommendations", []):
                 if r and r not in recs and len(recs) < 4:
                     recs.append(r)
+
+        # Domain agent uses singular 'recommendation'
+        dom_rec = domain.get("recommendation")
+        if dom_rec and dom_rec not in recs and len(recs) < 5:
+            recs.append(dom_rec)
 
         # Baseline safety recommendations
         if level in ("CRITICAL", "HIGH"):

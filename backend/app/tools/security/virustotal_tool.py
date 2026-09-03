@@ -37,6 +37,7 @@ class VirusTotalTool:
             # If VirusTotal has never seen this URL
             if response.status_code == 404:
                 return {
+                    "available": True,
                     "known": False,
                     "malicious": 0,
                     "suspicious": 0,
@@ -50,6 +51,7 @@ class VirusTotalTool:
             stats = data["data"]["attributes"]["last_analysis_stats"]
 
             return {
+                "available": True,
                 "known": True,
                 "malicious": stats.get("malicious", 0),
                 "suspicious": stats.get("suspicious", 0),
@@ -59,10 +61,6 @@ class VirusTotalTool:
 
         except Exception as e:
             return {
-                "known": False,
-                "malicious": 0,
-                "suspicious": 0,
-                "harmless": 0,
-                "undetected": 0,
+                "available": False,
                 "error": str(e),
             }
