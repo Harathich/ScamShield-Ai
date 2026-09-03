@@ -318,7 +318,38 @@ function generateDefaultRecommendations(threatLevel, context) {
 /**
  * High-fidelity intelligent simulated response for offline demonstrations
  */
-function generateSimulatedResponse({ text = '', url = '', agent = 'all', isImage = false, filename = '' }) {
+function generateSimulatedResponse({ text = '', url = '', agent = 'all', isImage = false, isPdf = false, filename = '' }) {
+  // If fallback is triggered for OCR / file upload without backend OCR text:
+  if ((isImage || isPdf) && (!text || text.startsWith('[Image OCR') || text.startsWith('[PDF Document'))) {
+    return {
+      id: 'scan_' + Date.now(),
+      timestamp: new Date().toISOString(),
+      queryContext: { text, url, agent, isImage, filename },
+      overall_risk_score: 0,
+      overall_threat_level: 'LOW',
+      confidence: 0.50,
+      normalized_metadata: {
+        detected_format: isImage ? 'image_ocr_text' : 'pdf_text',
+        extracted_urls: [],
+        extracted_emails: [],
+        extracted_phones: []
+      },
+      contributing_factors: [
+        `File '${filename || 'upload'}' processed in offline fallback mode. Connect to backend server for full OCR & multi-agent analysis.`
+      ],
+      agent_summary: {
+        threat_agent: 'Backend server offline; OCR unavailable.',
+        domain_agent: 'Backend server offline.',
+        identity_agent: 'Backend server offline.',
+        language_agent: 'Backend server offline.',
+        recruitment_agent: 'Backend server offline.'
+      },
+      detailed_results: {},
+      report: generateDefaultRecommendations('LOW', { text, url }),
+      isFallback: true
+    };
+  }
+
   const combined = (text + ' ' + url).toLowerCase();
 
   // Dynamic heuristic detection

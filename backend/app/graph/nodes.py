@@ -75,6 +75,12 @@ def preprocess_node(state: ScamShieldState) -> dict:
 def threat_node(state: ScamShieldState) -> dict:
     """Run the Threat Agent on the clean normalized text."""
     norm = state.get("normalized_content", {})
+    if norm.get("detected_format") == "url_only":
+        return {"threat_result": {
+            "agent": "threat",
+            "skipped": True,
+            "reason": "URL-only payload detected; threat text analysis skipped."
+        }}
     text = norm.get("clean_text") or state.get("input_text", "")
 
     if not text.strip():
@@ -101,6 +107,12 @@ def language_node(state: ScamShieldState) -> dict:
     Run Language Agent. Fast-paths simple neutral messages without LLM calls.
     """
     norm = state.get("normalized_content", {})
+    if norm.get("detected_format") == "url_only":
+        return {"language_result": {
+            "agent": "language",
+            "skipped": True,
+            "reason": "URL-only payload detected; language analysis skipped."
+        }}
     text = norm.get("clean_text") or state.get("input_text", "")
     words = set(re.findall(r'\b\w+\b', text.lower()))
 
@@ -138,6 +150,12 @@ def identity_node(state: ScamShieldState) -> dict:
     Run Identity Agent. Fast-paths inconclusive status when no sender indicators exist.
     """
     norm = state.get("normalized_content", {})
+    if norm.get("detected_format") == "url_only":
+        return {"identity_result": {
+            "agent": "identity",
+            "skipped": True,
+            "reason": "URL-only payload detected; identity analysis skipped."
+        }}
     text = norm.get("clean_text") or state.get("input_text", "")
     emails = norm.get("extracted_emails", [])
     phones = norm.get("extracted_phones", [])
@@ -212,6 +230,12 @@ def recruitment_node(state: ScamShieldState) -> dict:
     If no job context, marks skipped=True so it doesn't dilute other threat signals.
     """
     norm = state.get("normalized_content", {})
+    if norm.get("detected_format") == "url_only":
+        return {"recruitment_result": {
+            "agent": "recruitment",
+            "skipped": True,
+            "reason": "URL-only payload detected; recruitment analysis skipped."
+        }}
     text = norm.get("clean_text") or state.get("input_text", "")
     words = set(re.findall(r'\b\w+\b', text.lower()))
 
@@ -245,6 +269,7 @@ def recruitment_node(state: ScamShieldState) -> dict:
         return {"recruitment_result": result}
     except Exception as e:
         return {"recruitment_result": {"agent": "recruitment", "error": str(e)}}
+
 
 
 def risk_manager_node(state: ScamShieldState) -> dict:

@@ -32,7 +32,7 @@ class ContentPreprocessor:
 
     # Regex patterns for entity extraction
     URL_REGEX = re.compile(
-        r'(?:https?://|www\.)[a-zA-Z0-9.\-_~:/?#[\]@!$&\'()*+,;=%]+',
+        r'(?:https?://|www\.|[a-zA-Z0-9-]+\.(?:com|org|net|io|co|in|edu|gov|ai|biz|info|xyz|top|online|site|click|cc|me|app|dev|store|tech|live|ac\.in|co\.in|co\.uk))(?:/[a-zA-Z0-9.\-_~:/?#[\]@!$&\'()*+,;=%]*)?',
         re.IGNORECASE
     )
     EMAIL_REGEX = re.compile(
@@ -73,9 +73,20 @@ class ContentPreprocessor:
         cleaned = re.sub(r'[ \t]+', ' ', cleaned)
         cleaned = re.sub(r'\n\s*\n+', '\n\n', cleaned).strip()
 
-        # 4. Extract Entities
-        extracted_urls = cls.URL_REGEX.findall(raw_text)
-        # Normalize extracted URLs
+        # 4. Extract Emails first
+        formatted_emails = []
+        for email in cls.EMAIL_REGEX.findall(raw_text):
+            email_clean = email.rstrip('.,;!?:')
+            if email_clean not in formatted_emails:
+                formatted_emails.append(email_clean)
+
+        # Strip emails from URL search text so email domains aren't extracted as standalone URLs
+        text_for_urls = raw_text
+        for email in formatted_emails:
+            text_for_urls = text_for_urls.replace(email, '')
+
+        # Extract URLs
+        extracted_urls = cls.URL_REGEX.findall(text_for_urls)
         formatted_urls = []
         for u in extracted_urls:
             u_clean = u.rstrip('.,;!?:')
@@ -92,21 +103,22 @@ class ContentPreprocessor:
             if exp not in formatted_urls:
                 formatted_urls.insert(0, exp)
 
-        formatted_emails = []
-        for email in cls.EMAIL_REGEX.findall(raw_text):
-            # The regex permits dots in domains, so strip sentence punctuation
-            # that immediately follows an otherwise valid email address.
-            email_clean = email.rstrip('.,;!?:')
-            if email_clean not in formatted_emails:
-                formatted_emails.append(email_clean)
         extracted_phones = list(dict.fromkeys(cls.PHONE_REGEX.findall(raw_text)))
 
         # 5. Format Detection
+        text_without_urls = cleaned
+        for u in formatted_urls:
+            raw_u = u.replace('https://', '').replace('http://', '')
+            text_without_urls = re.sub(re.escape(raw_u), '', text_without_urls, flags=re.IGNORECASE)
+            text_without_urls = text_without_urls.replace('https://', '').replace('http://', '')
+        
+        words_left = [w for w in re.findall(r'\b[a-zA-Z0-9]+\b', text_without_urls) if w.lower() not in ('http', 'https', 'www')]
+
         if re.search(r'^(?:From:|Subject:|To:|Date:)', raw_text, re.MULTILINE | re.IGNORECASE):
             detected_format = "email"
         elif cls.WHATSAPP_TIMESTAMP_REGEX.search(raw_text) or cls.FORWARDED_LABEL_REGEX.search(raw_text):
             detected_format = "chat_message"
-        elif len(formatted_urls) == 1 and len(cleaned.split()) <= 2:
+        elif len(formatted_urls) >= 1 and len(words_left) == 0:
             detected_format = "url_only"
         else:
             detected_format = "plain_text"
@@ -119,3 +131,4 @@ class ContentPreprocessor:
             extracted_phones=extracted_phones,
             detected_format=detected_format
         )
+
