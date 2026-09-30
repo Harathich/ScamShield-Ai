@@ -34,7 +34,7 @@ def build_workflow():
     graph.add_node("domain", domain_node)
     graph.add_node("recruitment", recruitment_node)
     graph.add_node("risk_manager", risk_manager_node)
-    graph.add_node("report", report_node)
+    graph.add_node("report_generation", report_node)
 
     # Define edges (sequential pipeline)
     graph.set_entry_point("preprocess")
@@ -44,8 +44,8 @@ def build_workflow():
     graph.add_edge("identity", "domain")
     graph.add_edge("domain", "recruitment")
     graph.add_edge("recruitment", "risk_manager")
-    graph.add_edge("risk_manager", "report")
-    graph.add_edge("report", END)
+    graph.add_edge("risk_manager", "report_generation")
+    graph.add_edge("report_generation", END)
 
     return graph.compile()
 

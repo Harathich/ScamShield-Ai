@@ -1,10 +1,17 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from typing import Optional, Any
+from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
+from sqlalchemy.orm import Session
 import filetype
+import io
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 from app.models.orchestrator_models import FullAnalysisRequest, FullAnalysisResponse, NormalizedMetadata
 from app.graph.workflow import scamshield_workflow
 from app.services.ocr.ocr_service import OCRService
-
+from app.database.connection import get_db
+from app.models.db_models import User, ScanHistory
+from app.utils.auth_dependency import get_optional_current_user
 
 router = APIRouter(
     prefix="/analyze-all",
@@ -16,17 +23,71 @@ ocr_service = OCRService()
 MAX_FILE_SIZE_MB = 10
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"]
+ALLOWED_PDF_MIME_TYPES = ["application/pdf"]
+
+
+def to_dict(obj: Any) -> Any:
+    """Helper to convert Pydantic objects, dicts, or lists to JSON serializable dicts."""
+    if obj is None:
+        return None
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    if hasattr(obj, "dict"):
+        return obj.dict()
+    if isinstance(obj, dict):
+        return {k: to_dict(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [to_dict(x) for x in obj]
+    return obj
+
+
+def _save_scan_to_history(
+    current_user: Optional[User],
+    db: Session,
+    input_type: str,
+    input_content: str,
+    response: FullAnalysisResponse
+):
+    """Outer-layer helper to persist scan history for authenticated users."""
+    if not current_user or not db:
+        return
+    try:
+        agent_results = {
+            "contributing_factors": response.contributing_factors,
+            "confidence": response.confidence,
+            "normalized_metadata": to_dict(response.normalized_metadata),
+            "agent_summary": to_dict(response.agent_summary),
+            "report": to_dict(response.report),
+            "threat_result": to_dict(response.threat_result),
+            "language_result": to_dict(response.language_result),
+            "identity_result": to_dict(response.identity_result),
+            "domain_result": to_dict(response.domain_result),
+            "recruitment_result": to_dict(response.recruitment_result)
+        }
+        scan_record = ScanHistory(
+            user_id=current_user.id,
+            input_type=input_type,
+            input_content=input_content[:5000] if input_content else "Scanned Content",
+            overall_risk_score=response.overall_risk_score,
+            overall_threat_level=response.overall_threat_level,
+            agent_results=agent_results
+        )
+        db.add(scan_record)
+        db.commit()
+    except Exception as err:
+        print(f"[Warning] Failed to persist scan history: {err}")
+        db.rollback()
 
 
 @router.post("/", response_model=FullAnalysisResponse)
 @router.post("/analyze", response_model=FullAnalysisResponse)
-def full_analysis(request: FullAnalysisRequest):
+def full_analysis(
+    request: FullAnalysisRequest,
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Run the full ScamShield multi-agent analysis pipeline with input preprocessing.
-
-    Accepts any format or key name (e.g. `text`, `message`, `content`, `url`, `body`, raw string).
-    Cleans noise/obfuscation, extracts URLs/emails/phones, executes all 5 agents,
-    evaluates overall risk through Risk Manager, and generates a user-friendly report.
     """
     if not (request.text or "").strip() and not (request.url or "").strip():
         raise HTTPException(
@@ -63,7 +124,7 @@ def full_analysis(request: FullAnalysisRequest):
             extracted_phones=norm.get("extracted_phones", [])
         ) if norm else None
 
-        return FullAnalysisResponse(
+        response = FullAnalysisResponse(
             overall_risk_score=result.get("overall_risk_score", 0),
             overall_threat_level=result.get("overall_threat_level", "LOW"),
             contributing_factors=risk_manager_result.get("contributing_factors", []),
@@ -78,6 +139,13 @@ def full_analysis(request: FullAnalysisRequest):
             recruitment_result=result.get("recruitment_result"),
         )
 
+        # Non-intrusive outer layer scan persistence
+        input_type = "url" if request.url else "text"
+        input_content = request.url if request.url else request.text
+        _save_scan_to_history(current_user, db, input_type, input_content, response)
+
+        return response
+
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -86,14 +154,13 @@ def full_analysis(request: FullAnalysisRequest):
 
 
 @router.post("/image", response_model=FullAnalysisResponse)
-async def analyze_image_upload(file: UploadFile = File(...)):
+async def analyze_image_upload(
+    file: UploadFile = File(...),
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Run the full ScamShield multi-agent analysis pipeline on an uploaded screenshot or image.
-
-    1. Validates image format and safety constraints.
-    2. Runs secure OCR extraction using EasyOCR.
-    3. Passes extracted text through the ContentPreprocessor and all specialized agents.
-    4. Returns the complete unified scam analysis report.
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided.")
@@ -124,16 +191,62 @@ async def analyze_image_upload(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="No readable text could be extracted from the uploaded image.")
 
     # Feed extracted OCR text through the full multi-agent pipeline
-    return full_analysis(FullAnalysisRequest(text=extracted_text))
+    initial_state = {
+        "input_text": extracted_text,
+        "input_url": None,
+        "normalized_content": None,
+        "threat_result": None,
+        "language_result": None,
+        "identity_result": None,
+        "domain_result": None,
+        "recruitment_result": None,
+        "risk_manager_result": None,
+        "report": None,
+        "overall_risk_score": None,
+        "overall_threat_level": None,
+        "agent_summary": None,
+    }
 
-import io
-from pypdf import PdfReader
-from pypdf.errors import PdfReadError
+    result = scamshield_workflow.invoke(initial_state)
 
-ALLOWED_PDF_MIME_TYPES = ["application/pdf"]
+    risk_manager_result = result.get("risk_manager_result", {})
+    norm = result.get("normalized_content", {})
+
+    normalized_metadata = NormalizedMetadata(
+        detected_format=norm.get("detected_format", "image_ocr_text"),
+        extracted_urls=norm.get("extracted_urls", []),
+        extracted_emails=norm.get("extracted_emails", []),
+        extracted_phones=norm.get("extracted_phones", [])
+    ) if norm else None
+
+    response = FullAnalysisResponse(
+        overall_risk_score=result.get("overall_risk_score", 0),
+        overall_threat_level=result.get("overall_threat_level", "LOW"),
+        contributing_factors=risk_manager_result.get("contributing_factors", []),
+        confidence=risk_manager_result.get("confidence", 0),
+        normalized_metadata=normalized_metadata,
+        agent_summary=result.get("agent_summary", {}),
+        report=result.get("report"),
+        threat_result=result.get("threat_result"),
+        language_result=result.get("language_result"),
+        identity_result=result.get("identity_result"),
+        domain_result=result.get("domain_result"),
+        recruitment_result=result.get("recruitment_result"),
+    )
+
+    # Save to scan history with OCR context
+    input_content = f"[Image OCR ({file.filename})]: {extracted_text}"
+    _save_scan_to_history(current_user, db, "image", input_content, response)
+
+    return response
+
 
 @router.post("/pdf", response_model=FullAnalysisResponse)
-async def analyze_pdf_upload(file: UploadFile = File(...)):
+async def analyze_pdf_upload(
+    file: UploadFile = File(...),
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Run the full ScamShield multi-agent analysis pipeline on an uploaded PDF document.
     """
@@ -153,7 +266,6 @@ async def analyze_pdf_upload(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=f"File exceeds maximum size of {MAX_FILE_SIZE_MB}MB.")
 
     kind = filetype.guess(file_bytes)
-    # filetype might not confidently guess PDF in all minimal cases, but if it guesses something else, reject.
     if kind is not None and kind.mime not in ALLOWED_PDF_MIME_TYPES:
         raise HTTPException(status_code=400, detail="File content does not match a PDF format.")
 
@@ -179,4 +291,51 @@ async def analyze_pdf_upload(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="No readable text could be extracted from the uploaded PDF.")
 
     # Feed extracted PDF text through the full multi-agent pipeline
-    return full_analysis(FullAnalysisRequest(text=extracted_text))
+    initial_state = {
+        "input_text": extracted_text,
+        "input_url": None,
+        "normalized_content": None,
+        "threat_result": None,
+        "language_result": None,
+        "identity_result": None,
+        "domain_result": None,
+        "recruitment_result": None,
+        "risk_manager_result": None,
+        "report": None,
+        "overall_risk_score": None,
+        "overall_threat_level": None,
+        "agent_summary": None,
+    }
+
+    result = scamshield_workflow.invoke(initial_state)
+
+    risk_manager_result = result.get("risk_manager_result", {})
+    norm = result.get("normalized_content", {})
+
+    normalized_metadata = NormalizedMetadata(
+        detected_format=norm.get("detected_format", "pdf_text"),
+        extracted_urls=norm.get("extracted_urls", []),
+        extracted_emails=norm.get("extracted_emails", []),
+        extracted_phones=norm.get("extracted_phones", [])
+    ) if norm else None
+
+    response = FullAnalysisResponse(
+        overall_risk_score=result.get("overall_risk_score", 0),
+        overall_threat_level=result.get("overall_threat_level", "LOW"),
+        contributing_factors=risk_manager_result.get("contributing_factors", []),
+        confidence=risk_manager_result.get("confidence", 0),
+        normalized_metadata=normalized_metadata,
+        agent_summary=result.get("agent_summary", {}),
+        report=result.get("report"),
+        threat_result=result.get("threat_result"),
+        language_result=result.get("language_result"),
+        identity_result=result.get("identity_result"),
+        domain_result=result.get("domain_result"),
+        recruitment_result=result.get("recruitment_result"),
+    )
+
+    # Save to scan history with PDF context
+    input_content = f"[PDF Document ({file.filename})]: {extracted_text}"
+    _save_scan_to_history(current_user, db, "pdf", input_content, response)
+
+    return response

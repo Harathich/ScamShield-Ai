@@ -6,9 +6,14 @@ from PIL import Image, UnidentifiedImageError
 
 class OCRService:
     def __init__(self):
-        # Initialize EasyOCR reader for English (and Hindi since it's common in Indian scams)
-        # We use gpu=False by default for broader compatibility, but it could be configurable
-        self.reader = easyocr.Reader(['en'], gpu=False, verbose=False)
+        self._reader = None
+
+    @property
+    def reader(self):
+        """Lazy initialization of EasyOCR reader to ensure fast server startup."""
+        if self._reader is None:
+            self._reader = easyocr.Reader(['en'], gpu=False, verbose=False)
+        return self._reader
 
     def extract_text(self, image_bytes: bytes) -> dict:
         try:
@@ -22,7 +27,7 @@ class OCRService:
             # Convert to numpy array for EasyOCR
             image_np = np.array(image)
 
-            # Read text
+            # Read text using lazy reader
             results = self.reader.readtext(image_np)
 
             if not results:
@@ -66,14 +71,7 @@ class OCRService:
             raise e # Let genuine programming errors bubble up
 
     def _normalize_text(self, text: str) -> str:
-        # Trim leading/trailing whitespace
         text = text.strip()
-
-        # Replace multiple spaces with a single space (while keeping line breaks)
-        # Using a regex that matches horizontal whitespace only
         text = re.sub(r'[^\S\r\n]+', ' ', text)
-
-        # Replace 3 or more consecutive newlines with exactly 2
         text = re.sub(r'\n{3,}', '\n\n', text)
-
         return text

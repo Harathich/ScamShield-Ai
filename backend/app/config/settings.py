@@ -1,6 +1,12 @@
-from dotenv import load_dotenv
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Set thread limits for OpenBLAS / NumPy to prevent Windows thread memory exhaustion
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
 # Automatically search for .env in current working dir, backend/, and project root
 _curr_dir = Path.cwd()

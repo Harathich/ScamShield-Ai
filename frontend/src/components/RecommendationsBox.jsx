@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { 
-  Lightbulb, 
-  ShieldAlert, 
-  CheckSquare, 
-  PhoneCall, 
-  Copy, 
-  Check, 
-  ExternalLink, 
-  Share2, 
+import {
+  Lightbulb,
+  ShieldAlert,
+  CheckSquare,
+  PhoneCall,
+  Copy,
+  Check,
+  ExternalLink,
+  Share2,
   FileText,
   AlertOctagon,
   LifeBuoy
@@ -23,17 +23,21 @@ export default function RecommendationsBox({ result }) {
   const isHighRisk = score >= 50;
   const report = result.report || {};
 
-  const immediateActions = report.immediate_actions || [
-    'DO NOT click on any embedded links or download attachments.',
-    'DO NOT share One-Time Passwords (OTP), PINs, or banking passwords.',
-    'DO NOT send advance security deposits, gift cards, or crypto transfers.',
-    'Block and report the sender number/email immediately.'
-  ];
+  const immediateActions = report.immediate_actions || (isHighRisk ? [
+    'Do not enter passwords, OTPs, banking details, card information, or other sensitive information.',
+    'Verify the organization through its official website.',
+    'Do not download unknown attachments/files.',
+    'Do not reply to or contact the suspicious sender using contact details in the message.',
+    'If credentials were already entered, change the password through the legitimate website and enable MFA where appropriate.'
+  ] : [
+    'Verify that the message context matches the expected communication.',
+    'For sensitive actions, navigate directly to the organization\'s official website.',
+    'Do not rely solely on an automated scan before making financial or confidential decisions.'
+  ]);
 
   const verificationSteps = report.verification_steps || [
-    'Navigate to the organization’s official website manually by typing its URL.',
-    'Call the official customer support line listed on your physical card or bank statement.',
-    'Verify recruitment claims on the company’s official LinkedIn career page.'
+    'Visit the official website by typing the address directly into your browser rather than clicking provided links.',
+    'Contact official customer support using numbers published on legitimate statements or directories.'
   ];
 
   const reportingChannels = report.reporting_channels || [
@@ -62,7 +66,7 @@ ${reportingChannels.map(r => `• ${r.name}: ${r.helpline} (${r.url})`).join('\n
 
   return (
     <div className="rounded-2xl bg-[#0E1626]/95 border border-indigo-500/30 p-5 sm:p-6 shadow-2xl backdrop-blur-xl flex flex-col justify-between h-full">
-      
+
       <div>
         {/* Header with Title and Copy Action */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
@@ -144,18 +148,22 @@ ${reportingChannels.map(r => `• ${r.name}: ${r.helpline} (${r.url})`).join('\n
             <div className={`p-3 rounded-xl border text-xs leading-relaxed ${
               isHighRisk ? 'bg-red-500/10 border-red-500/30 text-red-300' : 'bg-blue-500/10 border-blue-500/30 text-blue-300'
             }`}>
-              {report.summary || (isHighRisk 
-                ? 'High danger detected. Follow these emergency steps immediately to prevent financial loss.' 
+              {report.summary || (isHighRisk
+                ? 'High danger detected. Follow these emergency steps immediately to prevent financial loss.'
                 : 'Content is evaluated with low danger, but maintain standard digital hygiene.')}
             </div>
 
             <div className="space-y-2">
               {immediateActions.map((action, idx) => (
-                <div 
-                  key={idx} 
+                <div
+                  key={idx}
                   className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-start gap-3 text-xs text-slate-200"
                 >
-                  <span className="w-5 h-5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 flex items-center justify-center text-[11px] font-bold flex-shrink-0 mt-0.5">
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 mt-0.5 ${
+                    isHighRisk
+                      ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                      : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  }`}>
                     {idx + 1}
                   </span>
                   <span className="leading-relaxed">{action}</span>
@@ -173,8 +181,8 @@ ${reportingChannels.map(r => `• ${r.name}: ${r.helpline} (${r.url})`).join('\n
             </p>
             <div className="space-y-2">
               {verificationSteps.map((step, idx) => (
-                <div 
-                  key={idx} 
+                <div
+                  key={idx}
                   className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-start gap-3 text-xs text-slate-200"
                 >
                   <CheckSquare className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />

@@ -7,17 +7,16 @@ import {
   Search, 
   Trash2, 
   ExternalLink, 
-  AlertTriangle,
-  FileSpreadsheet,
-  RefreshCw,
-  Sparkles
+  Sparkles 
 } from 'lucide-react';
 
 export default function Dashboard({ 
-  scanHistory, 
-  onSelectScan, 
+  scanHistory = [], 
+  onSelectScan,
+  onDeleteScan, 
   onClearHistory, 
-  onNewScan 
+  onNewScan,
+  user
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterLevel, setFilterLevel] = useState('ALL'); // 'ALL' | 'CRITICAL' | 'HIGH' | 'MODERATE' | 'LOW'
@@ -51,7 +50,7 @@ export default function Dashboard({
             Threat & Scan Analytics Dashboard
           </h1>
           <p className="text-xs sm:text-sm text-slate-400">
-            Real-time telemetry and history of all content analyzed by ScamShield AI.
+            Real-time telemetry and history of content analyzed by ScamShield AI for <span className="font-semibold text-slate-200">{user?.name || user?.email || 'Authenticated User'}</span>.
           </p>
         </div>
 
@@ -77,7 +76,7 @@ export default function Dashboard({
             <Clock className="w-4 h-4 text-blue-400" />
           </div>
           <p className="text-3xl font-extrabold text-white">{totalScans}</p>
-          <p className="text-[11px] text-slate-500">Live & simulated scam scans</p>
+          <p className="text-[11px] text-slate-500">Persisted database scans</p>
         </div>
 
         {/* High Risk Detected */}
@@ -149,7 +148,7 @@ export default function Dashboard({
                 type="button"
                 onClick={onClearHistory}
                 className="px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 text-xs font-semibold transition-colors flex items-center gap-1.5"
-                title="Clear local scan records"
+                title="Clear scan records"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Clear History</span>
@@ -164,7 +163,7 @@ export default function Dashboard({
           <div className="py-12 text-center text-slate-500 space-y-2">
             <ShieldCheck className="w-10 h-10 mx-auto text-slate-600" />
             <p className="text-sm font-medium">No scan history matches your filter.</p>
-            <p className="text-xs">Run a new scan from the homepage to populate threat logs.</p>
+            <p className="text-xs">Run a new scan from the scanner UI to populate threat logs.</p>
           </div>
         ) : (
           <div className="space-y-2.5">
@@ -184,10 +183,12 @@ export default function Dashboard({
               return (
                 <div
                   key={scan.id}
-                  onClick={() => onSelectScan(scan)}
-                  className="p-3.5 sm:p-4 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-blue-500/40 hover:bg-slate-900 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+                  className="p-3.5 sm:p-4 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-blue-500/40 hover:bg-slate-900 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
                 >
-                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <div 
+                    onClick={() => onSelectScan(scan)}
+                    className="flex items-start gap-3 flex-1 min-w-0 cursor-pointer"
+                  >
                     <div className={`p-2 rounded-lg border text-xs font-mono font-extrabold flex-shrink-0 ${getBadgeColor()}`}>
                       {score}%
                     </div>
@@ -199,7 +200,7 @@ export default function Dashboard({
                         <span>{timeStr}</span>
                         <span>•</span>
                         <span className="font-mono uppercase text-blue-400 text-[10px]">
-                          Agent: {scan.queryContext?.agent || 'All'}
+                          Type: {scan.queryContext?.input_type || scan.queryContext?.agent || 'Scan'}
                         </span>
                       </div>
                     </div>
@@ -209,10 +210,31 @@ export default function Dashboard({
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border tracking-wider ${getBadgeColor()}`}>
                       {level}
                     </span>
-                    <span className="text-xs font-semibold text-blue-400 group-hover:underline flex items-center gap-1">
+                    
+                    <button
+                      type="button"
+                      onClick={() => onSelectScan(scan)}
+                      className="text-xs font-semibold text-blue-400 hover:underline flex items-center gap-1"
+                    >
                       <span>Inspect</span>
                       <ExternalLink className="w-3 h-3" />
-                    </span>
+                    </button>
+
+                    {onDeleteScan && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm('Delete this scan from history?')) {
+                            onDeleteScan(scan.id);
+                          }
+                        }}
+                        className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                        title="Delete scan"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               );

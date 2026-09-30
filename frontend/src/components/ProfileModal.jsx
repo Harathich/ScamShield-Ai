@@ -1,19 +1,17 @@
 import React, { useState } from 'react';
 import { 
-  User, 
+  User as UserIcon, 
   X, 
   ShieldCheck, 
   Server, 
   Save, 
   Bell, 
-  Key, 
-  Trash2, 
-  Check, 
   HardDrive,
-  Lock
+  LogOut,
+  Check
 } from 'lucide-react';
 
-export default function ProfileModal({ isOpen, onClose, onClearAllData }) {
+export default function ProfileModal({ isOpen, onClose, user, onLogout, onClearAllData }) {
   const [apiUrl, setApiUrl] = useState(
     localStorage.getItem('scamshield_api_url') || 'http://localhost:8000'
   );
@@ -43,11 +41,11 @@ export default function ProfileModal({ isOpen, onClose, onClearAllData }) {
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold">
-              <User className="w-5 h-5" />
+              <UserIcon className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white">Security Profile & Settings</h2>
-              <p className="text-xs text-slate-400">Manage protection tier & backend connection</p>
+              <h2 className="text-base font-bold text-white">Security Profile & Account</h2>
+              <p className="text-xs text-slate-400">User credentials & system configuration</p>
             </div>
           </div>
           <button
@@ -60,21 +58,32 @@ export default function ProfileModal({ isOpen, onClose, onClearAllData }) {
         </div>
 
         {/* Profile Card */}
-        <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 my-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-full bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 font-bold">
-              H
+        {user ? (
+          <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 my-5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 font-bold uppercase text-lg">
+                {user.name ? user.name.charAt(0) : 'U'}
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">{user.name}</h3>
+                <p className="text-xs text-slate-400">{user.email}</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-white">Harathi (Admin User)</h3>
-              <p className="text-xs text-slate-400">harathi@scamshield.ai</p>
-            </div>
+            <button
+              type="button"
+              onClick={() => { onLogout(); onClose(); }}
+              className="px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 text-xs font-bold transition-all flex items-center gap-1.5"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Log Out</span>
+            </button>
           </div>
-          <span className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            Active Pro Guard
-          </span>
-        </div>
+        ) : (
+          <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 my-5 text-center space-y-1">
+            <p className="text-xs font-semibold text-slate-300">You are currently operating in Guest Mode.</p>
+            <p className="text-[11px] text-slate-400">Sign in to save every scan automatically to PostgreSQL history.</p>
+          </div>
+        )}
 
         {/* Settings Form */}
         <form onSubmit={handleSaveSettings} className="space-y-4 text-xs">
@@ -119,12 +128,12 @@ export default function ProfileModal({ isOpen, onClose, onClearAllData }) {
             <div className="flex items-center justify-between">
               <span className="font-semibold text-slate-200 flex items-center gap-1.5">
                 <HardDrive className="w-3.5 h-3.5 text-purple-400" />
-                <span>Local Privacy & Storage</span>
+                <span>Persistent Database Security</span>
               </span>
-              <span className="text-[11px] text-slate-400">Zero Cloud Retention</span>
+              <span className="text-[11px] text-emerald-400 font-semibold">PostgreSQL Persistent Storage</span>
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              All scans and OCR data are stored exclusively in your browser’s local storage.
+              Authenticated scans are securely bound to your User ID and stored in PostgreSQL with strict authorization controls.
             </p>
           </div>
 

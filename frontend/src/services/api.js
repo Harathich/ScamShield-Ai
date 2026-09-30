@@ -1,8 +1,32 @@
 /**
- * ScamShield AI - API & Multi-Agent Communication Client
+ * ScamShield AI - API & Multi-Agent Communication Client with Authentication & History
  */
 
 const API_BASE_URL = localStorage.getItem('scamshield_api_url') || 'http://localhost:8000';
+
+export function getAuthToken() {
+  return localStorage.getItem('scamshield_token') || null;
+}
+
+export function setAuthToken(token) {
+  if (token) {
+    localStorage.setItem('scamshield_token', token);
+  } else {
+    localStorage.removeItem('scamshield_token');
+  }
+}
+
+export function removeAuthToken() {
+  localStorage.removeItem('scamshield_token');
+}
+
+function getAuthHeaders(headers = {}) {
+  const token = getAuthToken();
+  if (token) {
+    return { ...headers, Authorization: `Bearer ${token}` };
+  }
+  return headers;
+}
 
 export async function checkBackendHealth() {
   try {
@@ -20,10 +44,172 @@ export async function checkBackendHealth() {
   }
 }
 
-/**
- * Main analysis function supporting both Live Backend and Smart Client-side Fallback
- */
+/* ==================== AUTHENTICATION API ==================== */
+
+export async function registerUser({ name, email, password }) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      return { success: true, data };
+    }
+    return { success: false, error: data.detail || 'Registration failed' };
+  } catch (err) {
+    return { success: false, error: 'Network error during registration' };
+  }
+}
+
+export async function loginUser({ email, password }) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (res.ok && data.access_token) {
+      setAuthToken(data.access_token);
+      return { success: true, data };
+    }
+    return { success: false, error: data.detail || 'Invalid email or password' };
+  } catch (err) {
+    return { success: false, error: 'Network error during login' };
+  }
+}
+
+export async function fetchCurrentUser() {
+  const token = getAuthToken();
+  if (!token) return { success: false, error: 'No token found' };
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/users/me`, {
+      headers: getAuthHeaders()
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return { success: true, user: data };
+    }
+    removeAuthToken();
+    return { success: false, error: 'Session expired' };
+  } catch (err) {
+    return { success: false, error: 'Failed to fetch current user' };
+  }
+}
+
+export async function logoutUser() {
+  try {
+    const token = getAuthToken();
+    if (token) {
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+    }
+  } catch (err) {
+    console.warn('Logout API warning:', err);
+  } finally {
+    removeAuthToken();
+  }
+}
+
+/* ==================== SCAN HISTORY API ==================== */
+
+export async function fetchScanHistory() {
+  const token = getAuthToken();
+  if (!token) return { success: false, data: [] };
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/history`, {
+      headers: getAuthHeaders()
+    });
+    if (res.ok) {
+      const data = await res.json();
+      // Format database scan history entries to match frontend display format
+      const formatted = data.map(item => formatHistoryRecord(item));
+      return { success: true, data: formatted };
+    }
+    return { success: false, data: [] };
+  } catch (err) {
+    console.warn('Failed to fetch scan history from backend:', err);
+    return { success: false, data: [] };
+  }
+}
+
+export async function fetchScanDetails(scanId) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/history/${scanId}`, {
+      headers: getAuthHeaders()
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return { success: true, data: formatHistoryRecord(data) };
+    }
+    const errData = await res.json().catch(() => ({}));
+    return { success: false, status: res.status, error: errData.detail || 'Scan not found or access denied' };
+  } catch (err) {
+    return { success: false, status: 500, error: 'Network error fetching scan' };
+  }
+}
+
+export async function deleteScanHistory(scanId) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/history/${scanId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+    if (res.ok) {
+      return { success: true };
+    }
+    const errData = await res.json().catch(() => ({}));
+    return { success: false, status: res.status, error: errData.detail || 'Failed to delete scan' };
+  } catch (err) {
+    return { success: false, error: 'Network error deleting scan' };
+  }
+}
+
+function formatHistoryRecord(item) {
+  const agentResults = item.agent_results || {};
+  return {
+    id: item.id,
+    timestamp: item.created_at,
+    queryContext: {
+      text: item.input_content,
+      url: item.input_type === 'url' ? item.input_content : '',
+      agent: 'all',
+      input_type: item.input_type
+    },
+    overall_risk_score: item.overall_risk_score,
+    overall_threat_level: item.overall_threat_level,
+    confidence: agentResults.confidence || 0.94,
+    normalized_metadata: agentResults.normalized_metadata || {
+      detected_format: item.input_type,
+      extracted_urls: [],
+      extracted_emails: [],
+      extracted_phones: []
+    },
+    contributing_factors: agentResults.contributing_factors || [],
+    agent_summary: agentResults.agent_summary || {},
+    detailed_results: {
+      threat: agentResults.threat_result,
+      domain: agentResults.domain_result,
+      identity: agentResults.identity_result,
+      language: agentResults.language_result,
+      recruitment: agentResults.recruitment_result
+    },
+    report: agentResults.report || generateDefaultRecommendations(item.overall_threat_level, { text: item.input_content }),
+    isFallback: false
+  };
+}
+
+/* ==================== MAIN ANALYSIS PIPELINE ==================== */
+
 export async function analyzeContent({ text = '', url = '', agent = 'all', file = null }) {
+  const authHeaders = getAuthHeaders();
+
   try {
     // If a file was uploaded for OCR or PDF analysis
     if (file) {
@@ -36,6 +222,7 @@ export async function analyzeContent({ text = '', url = '', agent = 'all', file 
       try {
         const response = await fetch(endpoint, {
           method: 'POST',
+          headers: authHeaders, // Automatic Authorization header attachment
           body: formData,
         });
 
@@ -44,7 +231,7 @@ export async function analyzeContent({ text = '', url = '', agent = 'all', file 
           return formatBackendResponse(data, { text: `[${isPdf ? 'PDF Document' : 'Image OCR'}: ${file.name}]`, url: '', agent: isPdf ? 'pdf' : 'ocr' });
         }
       } catch (err) {
-        console.warn(`Backend ${isPdf ? 'PDF' : 'image OCR'} request failed, using intelligent simulation fallback`, err);
+        console.warn(`Backend ${isPdf ? 'PDF' : 'image OCR'} request failed, using simulation fallback`, err);
       }
 
       // Simulated Image/PDF scan fallback
@@ -83,7 +270,7 @@ export async function analyzeContent({ text = '', url = '', agent = 'all', file 
 
         const response = await fetch(endpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify(body),
         });
 
@@ -100,7 +287,7 @@ export async function analyzeContent({ text = '', url = '', agent = 'all', file 
     try {
       const response = await fetch(`${API_BASE_URL}/analyze-all/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ text: text || undefined, url: url || undefined }),
       });
 
@@ -109,7 +296,7 @@ export async function analyzeContent({ text = '', url = '', agent = 'all', file 
         return formatBackendResponse(data, { text, url, agent });
       }
     } catch (err) {
-      console.warn('Backend orchestrator not reachable, generating comprehensive local analysis', err);
+      console.warn('Backend orchestrator not reachable, generating local analysis', err);
     }
 
     // Fallback simulation for offline demos
@@ -121,7 +308,6 @@ export async function analyzeContent({ text = '', url = '', agent = 'all', file 
 }
 
 function formatBackendResponse(data, queryContext) {
-  // Check if response is from an individual agent vs orchestrator
   const isFullOrchestrator = data.overall_risk_score !== undefined || data.report !== undefined;
 
   let riskScore = 0;
@@ -136,7 +322,6 @@ function formatBackendResponse(data, queryContext) {
     threatLevel = data.overall_threat_level || (riskScore > 75 ? 'CRITICAL' : riskScore > 50 ? 'HIGH' : riskScore > 25 ? 'MODERATE' : 'LOW');
     contributingFactors = data.contributing_factors || [];
 
-    // Format agent summary from orchestrator
     if (typeof data.agent_summary === 'object' && data.agent_summary !== null) {
       agentSummary = {
         threat_agent: typeof data.agent_summary.threat === 'object'
@@ -168,11 +353,9 @@ function formatBackendResponse(data, queryContext) {
     report = data.report || generateDefaultRecommendations(threatLevel, queryContext);
 
   } else {
-    // Individual Agent Response Normalization
     riskScore = data.risk_score !== undefined ? data.risk_score : 50;
     threatLevel = data.threat_level || data.risk_level || (riskScore > 75 ? 'CRITICAL' : riskScore > 50 ? 'HIGH' : riskScore > 25 ? 'MODERATE' : 'LOW');
 
-    // 1. Domain Agent Response
     if (data.agent === 'domain' || data.domain !== undefined) {
       contributingFactors = [
         ...(data.technical_red_flags || []),
@@ -188,9 +371,7 @@ function formatBackendResponse(data, queryContext) {
         verification_steps: ['Check domain registration on official WHOIS directories.', 'Verify SSL lock and company registry.'],
         reporting_channels: generateDefaultRecommendations(threatLevel, queryContext).reporting_channels
       };
-    }
-    // 2. Language Agent Response
-    else if (data.agent === 'language' || data.manipulation_techniques !== undefined) {
+    } else if (data.agent === 'language' || data.manipulation_techniques !== undefined) {
       contributingFactors = [
         ...(data.manipulation_techniques || []),
         data.summary || data.reason
@@ -205,9 +386,7 @@ function formatBackendResponse(data, queryContext) {
         verification_steps: ['Pause and consult an independent family member or trusted advisor before taking financial actions.'],
         reporting_channels: generateDefaultRecommendations(threatLevel, queryContext).reporting_channels
       };
-    }
-    // 3. Identity Agent Response
-    else if (data.agent === 'identity' || data.verification_status !== undefined) {
+    } else if (data.agent === 'identity' || data.verification_status !== undefined) {
       contributingFactors = [
         ...(data.identity_red_flags || []),
         ...(data.mismatch_findings || []),
@@ -223,9 +402,7 @@ function formatBackendResponse(data, queryContext) {
         verification_steps: ['Contact the claimed organization through their publicly listed directory.'],
         reporting_channels: generateDefaultRecommendations(threatLevel, queryContext).reporting_channels
       };
-    }
-    // 4. Recruitment Agent Response
-    else if (data.recruitment_red_flags !== undefined || data.job_information !== undefined) {
+    } else if (data.recruitment_red_flags !== undefined || data.job_information !== undefined) {
       contributingFactors = [
         ...(data.recruitment_red_flags || []),
         ...(data.consistency_findings || []),
@@ -241,9 +418,7 @@ function formatBackendResponse(data, queryContext) {
         verification_steps: ['Look up the recruiter profile on official LinkedIn and official company job portals.'],
         reporting_channels: generateDefaultRecommendations(threatLevel, queryContext).reporting_channels
       };
-    }
-    // 5. Threat Agent Response
-    else {
+    } else {
       contributingFactors = [
         ...(data.red_flags || []),
         data.reason
@@ -294,18 +469,19 @@ function generateDefaultRecommendations(threatLevel, context) {
       ? 'This content exhibits prominent red flags commonly associated with phishing and financial fraud. Exercise extreme caution.'
       : 'This content appears relatively safe, but always verify sender credentials through official verified channels.',
     immediate_actions: isHigh ? [
-      'DO NOT click any embedded links or download attachments.',
-      'DO NOT share your One-Time Password (OTP), UPI PIN, or banking passwords.',
-      'DO NOT send advance fees or security deposits via cryptocurrency or gift cards.',
-      'Block the sender on WhatsApp, Telegram, or SMS immediately.'
+      'Do not enter passwords, OTPs, banking details, card information, or other sensitive information.',
+      'Verify the organization through its official website.',
+      'Do not download unknown attachments/files.',
+      'Do not reply to or contact the suspicious sender using contact details in the message.',
+      'If credentials were already entered, change the password through the legitimate website and enable MFA where appropriate.'
     ] : [
-      'Cross-check the sender email domain with the company’s official website.',
-      'Ensure the browser shows a valid SSL lock and official domain spelling.'
+      'Verify that the message context matches the expected communication.',
+      'For sensitive actions, navigate directly to the organization\'s official website.',
+      'Do not rely solely on an automated scan before making financial or confidential decisions.'
     ],
     verification_steps: [
       'Visit the official website by typing the address directly into your browser rather than clicking provided links.',
-      'Contact official customer support using numbers published on legitimate statements or directories.',
-      'Verify employment offers on the company’s official LinkedIn career page or HR email.'
+      'Contact official customer support using numbers published on legitimate statements or directories.'
     ],
     reporting_channels: [
       { name: 'National Cyber Crime Portal (India)', url: 'https://cybercrime.gov.in', helpline: '1930' },
@@ -349,10 +525,8 @@ function generateSimulatedResponse({ text = '', url = '', agent = 'all', isImage
       isFallback: true
     };
   }
-
   const combined = (text + ' ' + url).toLowerCase();
 
-  // Dynamic heuristic detection
   const isFinancial = combined.includes('bank') || combined.includes('account') || combined.includes('suspended') || combined.includes('otp') || combined.includes('kyc') || combined.includes('upi') || combined.includes('card');
   const isRecruitment = combined.includes('job') || combined.includes('task') || combined.includes('telegram') || combined.includes('earn') || combined.includes('salary') || combined.includes('daily') || combined.includes('part-time');
   const isUrgent = combined.includes('urgent') || combined.includes('immediately') || combined.includes('24 hours') || combined.includes('blocked') || combined.includes('threat') || combined.includes('police');

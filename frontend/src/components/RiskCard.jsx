@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
-import { 
-  ShieldAlert, 
-  ShieldCheck, 
-  AlertTriangle, 
-  ChevronDown, 
-  Globe, 
-  UserCheck, 
-  MessageSquareWarning, 
-  Briefcase, 
-  Fingerprint, 
-  Link as LinkIcon, 
-  Mail, 
+import {
+  ShieldAlert,
+  ShieldCheck,
+  AlertTriangle,
+  ChevronDown,
+  Globe,
+  UserCheck,
+  MessageSquareWarning,
+  Briefcase,
+  Fingerprint,
+  Link as LinkIcon,
+  Mail,
   Phone,
   Info
 } from 'lucide-react';
@@ -77,7 +77,7 @@ export default function RiskCard({ result }) {
 
   return (
     <div className={`rounded-2xl bg-[#0E1626]/95 border ${theme.border} p-5 sm:p-6 shadow-2xl backdrop-blur-xl flex flex-col justify-between transition-all h-full`}>
-      
+
       <div>
         {/* Card Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
@@ -97,7 +97,7 @@ export default function RiskCard({ result }) {
 
         {/* Circular Risk Meter & Summary */}
         <div className="flex flex-col sm:flex-row items-center gap-6 my-6">
-          
+
           {/* Radial Meter SVG */}
           <div className="relative flex items-center justify-center flex-shrink-0">
             <svg className="w-36 h-36 transform -rotate-90">
@@ -150,26 +150,131 @@ export default function RiskCard({ result }) {
 
         </div>
 
-        {/* Contributing Factors Section */}
-        {result.contributing_factors && result.contributing_factors.length > 0 && (
-          <div className="mb-4">
-            <h5 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-              <span>Key Identified Red Flags</span>
-            </h5>
-            <div className="space-y-1.5">
-              {result.contributing_factors.map((factor, idx) => (
-                <div 
-                  key={idx} 
-                  className="p-2 rounded-lg bg-slate-900/80 border border-slate-800 text-xs text-slate-300 flex items-start gap-2"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 flex-shrink-0" />
-                  <span className="leading-snug">{factor}</span>
+        {/* Contributing Factors / Why Risky Section */}
+        {(() => {
+          // Determine if we have why_risky or safe_indicators from backend report
+          const report = result.report || {};
+          const whyRisky = report.why_risky || [];
+          const safeIndicators = report.safe_indicators || [];
+          const useBackendReasons = whyRisky.length > 0 || safeIndicators.length > 0;
+
+          if (useBackendReasons) {
+            if (score >= 50) {
+              return (
+                <div className="mb-4 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <h5 className="text-xs font-bold text-red-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    <span>Why This Is Risky</span>
+                  </h5>
+                  <div className="space-y-1.5">
+                    {whyRisky.map((factor, idx) => (
+                      <div key={idx} className="p-2 rounded-lg bg-slate-900/80 border border-red-500/20 text-xs text-slate-300 flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 flex-shrink-0" />
+                        <span className="leading-snug">{factor}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
+              );
+            } else {
+              return (
+                <div className="mb-4 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                  <h5 className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>Why This Received A Low-Risk Score</span>
+                  </h5>
+                  <div className="space-y-1.5">
+                    {safeIndicators.length > 0 ? safeIndicators.map((factor, idx) => (
+                      <div key={idx} className="p-2 rounded-lg bg-slate-900/80 border border-emerald-500/20 text-xs text-slate-300 flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />
+                        <span className="leading-snug">{factor}</span>
+                      </div>
+                    )) : (
+                      <div className="p-2 rounded-lg bg-slate-900/80 border border-emerald-500/20 text-xs text-slate-300 flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />
+                        <span className="leading-snug">No significant phishing indicators detected.</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+          }
+
+          // Fallback to old contributing factors if backend doesn't provide why_risky
+          if (result.contributing_factors && result.contributing_factors.length > 0) {
+            return (
+              <div className="mb-4">
+                <h5 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Key Identified Red Flags</span>
+                </h5>
+                <div className="space-y-1.5">
+                  {result.contributing_factors.map((factor, idx) => (
+                    <div key={idx} className="p-2 rounded-lg bg-slate-900/80 border border-slate-800 text-xs text-slate-300 flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 flex-shrink-0" />
+                      <span className="leading-snug">{factor}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+
+          return null;
+        })()}
+
+        {/* Domain Verification Section */}
+        {(() => {
+          const domainResult = result.detailed_results?.domain;
+          if (!domainResult || domainResult.skipped || !domainResult.domain) return null;
+
+          return (
+            <div className="mb-4 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+              <h5 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5" />
+                <span>Domain Verification</span>
+              </h5>
+
+              <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                <div className="bg-slate-900/80 p-2 rounded border border-slate-800">
+                  <div className="text-[10px] text-slate-500 font-bold uppercase mb-0.5">Domain</div>
+                  <div className="text-slate-200 font-mono truncate" title={domainResult.domain}>{domainResult.domain || 'Not available'}</div>
+                </div>
+                <div className="bg-slate-900/80 p-2 rounded border border-slate-800">
+                  <div className="text-[10px] text-slate-500 font-bold uppercase mb-0.5">Verification</div>
+                  <div className={`font-bold ${domainResult.verification_status === 'VERIFIED' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {domainResult.verification_status ? domainResult.verification_status.replace('_', ' ') : 'Not available'}
+                  </div>
+                </div>
+                <div className="bg-slate-900/80 p-2 rounded border border-slate-800">
+                  <div className="text-[10px] text-slate-500 font-bold uppercase mb-0.5">Accessibility</div>
+                  <div className={`font-bold ${domainResult.access_status === 'ACCESSIBLE' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {domainResult.access_status ? domainResult.access_status.replace('_', ' ') : 'Not available'}
+                  </div>
+                </div>
+                <div className="bg-slate-900/80 p-2 rounded border border-slate-800">
+                  <div className="text-[10px] text-slate-500 font-bold uppercase mb-0.5">SSL Certificate</div>
+                  <div className="text-slate-200">{domainResult.ssl_status ? domainResult.ssl_status.replace('_', ' ') : 'Not available'}</div>
+                </div>
+                <div className="bg-slate-900/80 p-2 rounded border border-slate-800">
+                  <div className="text-[10px] text-slate-500 font-bold uppercase mb-0.5">Domain Age</div>
+                  <div className="text-slate-200">{domainResult.domain_age || 'Not available'}</div>
+                </div>
+                <div className="bg-slate-900/80 p-2 rounded border border-slate-800">
+                  <div className="text-[10px] text-slate-500 font-bold uppercase mb-0.5">HTTPS</div>
+                  <div className="text-slate-200">{domainResult.ssl_status === 'VALID' ? 'Enabled' : (domainResult.ssl_status === 'UNAVAILABLE' ? 'Disabled/Unavailable' : 'Not available')}</div>
+                </div>
+              </div>
+
+              {domainResult.explanation && (
+                <div className="text-[11px] text-slate-400 leading-relaxed bg-slate-900/40 p-2 rounded italic border border-slate-800/50">
+                  {domainResult.explanation}
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Extracted Metadata Chips */}
         {result.normalized_metadata && (
@@ -216,7 +321,7 @@ export default function RiskCard({ result }) {
 
         {showDetails && (
           <div className="mt-3 space-y-2 pt-2 border-t border-slate-800/80 animate-in fade-in duration-200">
-            
+
             {/* Domain Agent */}
             <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs">
               <div className="flex items-center justify-between mb-1">
